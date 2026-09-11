@@ -6,7 +6,7 @@
 | 日期 | 2026-09-11 |
 | 作者 | 儀表 |
 | 對照 | AC v1.1 §5.2；AC-F6／F7；v1.1a；v1.3a（F11–F13′／F12）；**v1.4 F14–F19** |
-| 狀態 | **draft** — 待帳本 `spending_align` 欄位定稿；**UI 不計價／不自 PASS** |
+| 狀態 | **draft→定案就緒** — OPEN-BIND-S1…S4 已由帳本回填；**UI 不計價／不自 PASS** |
 | 姊妹 | [`mini-panel-ia-v0.4-draft.md`](./mini-panel-ia-v0.4-draft.md) |
 | 前版 | [`spend-summary-binding-v0.md`](./spend-summary-binding-v0.md)（v0.3 定案） |
 
@@ -17,7 +17,7 @@
 繼承 v0.3 `SpendSummary` 形狀（currency／total／by_agent／by_model／by_usage_pool／disclaimer／…）。本版 **新增對照層**，不改 notional 計價語意：
 
 ```text
-// 帳本待定（OPEN — 見 §7）；儀表先鎖 VM 消費面
+// 帳本已定：design/ledger/open-bind-spending-align-v0.md（OPEN-BIND-S1…S4）
 SpendingAlign? {
   cursor_models_pct: number | null     // 0–100；對齊目標
   other_models_pct: number | null
@@ -117,17 +117,25 @@ OPEN-UI-1…4（today／series／ImportMeta／by_model＋by_usage_pool）維持 
 spend total / today / by-model / by-pool / series / import status
 ```
 
-### 3.1 新增：Spending align 載入（draft）
+### 3.1 新增：Spending align 載入（對帳本 OPEN-BIND v0）
 
 ```text
 UI refresh | spending_manual_save | admin_import_done
     →（與 A 區並行、獨立 payload）
-         spend spending-align --json   # 名稱待帳本；或獨立 ImportMeta 旁路
+         spend spending-align --json [--state <path>]
+         # manual_p1 寫入：spend spending-align set --json <file>
+         #   → 狀態檔 .token-tracer/spending-align.json（與 ImportMeta 分離）
     → spending_align ← SpendingAlignVM | null
-    → 映射時：若誤把 notional total 寫入 pct → BIND 違規（測試應抓）
+    →（F14 另路）spend cursor official-reconcile … → OfficialAdminReconcileVM
+         # 不把 Σ chargedCents 寫入 cursor_models_pct／other_models_pct
+    → 映射時：若誤把 notional total／by_usage_pool.amount 寫入 pct → BIND 違規
 ```
 
 **明確：local notional totals must not drive `spending_align` %。**
+
+### 3.2 `OfficialAdminReconcileVM`（F14；另物件）
+
+消費帳本 `OfficialAdminReconcile`：`events_charged_cents_sum`、`spend_overall_cents`、`delta_cents`、`within_tol`、可選 period。UI 可另區塊顯示對帳結果；**禁止**把 cents 換成 B 區池％。
 
 ---
 
@@ -172,16 +180,20 @@ UI refresh | spending_manual_save | admin_import_done
 
 ---
 
-## 7. OPEN（帳本 — 擋正式 v0.4 去 draft）
+## 7. OPEN-BIND-S1…S4 — ✅ 帳本已回填
 
-| ID | 內容 |
-|----|------|
-| **OPEN-BIND-S1** | `SpendingAlign`（或等價）帳本 schema／CLI：`Team Admin (F14)` 是否併入同一物件，或 `official_admin` 另附 `charged_cents_reconcile` |
-| **OPEN-BIND-S2** | 個人 PARTIAL（F17）：`manual_p1` 儲存位置（ledger 旁路 vs settings）；截圖核對是否只留 UI 態 |
-| **OPEN-BIND-S3** | `source_mode` 枚舉是否與規格 `official_admin`／`local_enrichment`／`undocumented_dashboard` 1:1 對表（本 draft VM 用 `manual_p1`＋`undocumented_opt_in` 對齊產品語意） |
-| **OPEN-BIND-S4** | `grok_bot_week_note` 是否升級為結構化欄（HOLD 至 OPEN-C9） |
+契約全文：[`../ledger/open-bind-spending-align-v0.md`](../ledger/open-bind-spending-align-v0.md)
 
-不擋本 draft 交付；實作 mock 可先硬編碼 `SpendingAlignVM` fixture（標 example data）。
+| ID | 狀態 | 儀表消費要點 |
+|----|------|--------------|
+| **S1** | ✅ | `SpendingAlign`＋CLI `spend spending-align`；F14＝另物件 `OfficialAdminReconcile`（勿把 Σ chargedCents 塞進％） |
+| **S2** | ✅ | `manual_p1` → `.token-tracer/spending-align.json`；截圖只 UI／路徑註記；個人機器％可 null |
+| **S3** | ✅ | `manual_p1`↔P1；`official_admin`↔同名；`undocumented_opt_in`↔`undocumented_dashboard`；`local_enrichment` **不**進 `source_mode`（只影響 A／F15） |
+| **S4** | ✅ | `grok_bot_week_note` 維持字串至 OPEN-C9 |
+
+硬約束（測試）：禁 `f(by_usage_pool.amount)→pct`；禁 notional total 驅動 SpendingAlign；A／B payload 分開。
+
+正式去 draft 升 **UI-BIND v0.4** 時對這份＋帳本契約即可（待指揮官排程）。
 
 ---
 
@@ -199,7 +211,7 @@ UI refresh | spending_manual_save | admin_import_done
 
 | 角色 | 期待 |
 |------|------|
-| 帳本 | 回填 OPEN-BIND-S1…S3；不把 notional 當 Spending % |
+| 帳本 | OPEN-BIND-S1…S4 ✅；CLI／狀態檔；不把 notional 當 Spending % |
 | 橋樑 | IPC 透傳兩路 payload；不合併計算 |
 | 儀表 | IA＋本綁定 draft；mock 雙表面；不計價 |
 | 驗收官 | F12／F15／F17–F19 視覺＋對 CLI；最終 PASS 僅驗收官 |
@@ -213,10 +225,10 @@ UI refresh | spending_manual_save | admin_import_done
 | IA 雙表面 | **draft** `mini-panel-ia-v0.4-draft.md` |
 | MiniPanelVM.`spending_align` | **本文件 draft** |
 | Local ↛ Spending % | **鎖定** |
-| 帳本 schema | **OPEN** |
+| 帳本 schema | **✅ OPEN-BIND spending-align v0** |
 | 產品碼／PASS | **無**（設計稿 only） |
 
 ---
 
 **UI-BIND v0.4-draft — 儀表草案（AC v1.4-cursor-official）**  
-**狀態：draft · 待帳本欄位／指揮官 · 不自 PASS**
+**狀態：draft（OPEN 已回填）· 待指揮官定案去 draft／實作 · 不自 PASS**

@@ -1,7 +1,8 @@
 /**
  * Pure SpendSummary / series / ImportMeta → MiniPanelVM mapping.
  * No pricing. No side effects.
- * UI-BIND v0.3 / BY-MODEL v0.2 — filter sentinel models; group by usage_pool.
+ * UI-BIND v0.4-draft / BY-MODEL v0.2 — filter sentinel models; group by usage_pool;
+ * SpendingAlign is a separate payload (never f(by_usage_pool.amount) → pct).
  */
 import type {
   AgentId,
@@ -10,13 +11,18 @@ import type {
   ImportMeta,
   MiniPanelVM,
   ModelRowVM,
+  OfficialAdminReconcile,
+  OfficialAdminReconcileVM,
   PanelRangeKind,
   PoolGroupVM,
+  SpendingAlign,
+  SpendingAlignSourceMode,
+  SpendingAlignVM,
   SpendSummary,
   UsagePool,
   WarningVM,
 } from "../types";
-import { DEFAULT_DISCLAIMER } from "../types";
+import { DEFAULT_DISCLAIMER, F17_PARTIAL_REASON } from "../types";
 
 const DISPLAY_NAMES: Record<string, string> = {
   cursor: "Cursor",
@@ -148,12 +154,75 @@ export function mapByUsagePool(
   }));
 }
 
+
+const SOURCE_MODES = new Set<SpendingAlignSourceMode>([
+  "none",
+  "manual_p1",
+  "official_admin",
+  "undocumented_opt_in",
+]);
+
+/**
+ * Map SpendingAlign wire → SpendingAlignVM.
+ * Pass-through only — MUST NOT accept notional totals / by_usage_pool amounts.
+ */
+export function mapSpendingAlign(
+  raw: SpendingAlign | null | undefined,
+): SpendingAlignVM | null {
+  if (!raw) return null;
+  const mode = SOURCE_MODES.has(raw.source_mode) ? raw.source_mode : "none";
+  const partial = Boolean(raw.partial);
+  let partial_reason = raw.partial_reason ?? null;
+  if (partial && !partial_reason?.trim()) {
+    partial_reason = F17_PARTIAL_REASON;
+  }
+  // Personal / manual path must keep F17 「無公開個人 usage API」 visible when partial.
+  if (
+    partial &&
+    (mode === "manual_p1" || mode === "none") &&
+    partial_reason &&
+    !partial_reason.includes("無公開個人 usage API")
+  ) {
+    partial_reason = `${partial_reason} · 無公開個人 usage API`;
+  }
+  return {
+    cursor_models_pct: raw.cursor_models_pct ?? null,
+    other_models_pct: raw.other_models_pct ?? null,
+    reset_label: raw.reset_label ?? null,
+    on_demand: raw.on_demand ?? null,
+    source_mode: mode,
+    partial,
+    partial_reason,
+    grok_bot_week_note: raw.grok_bot_week_note ?? null,
+    is_example: Boolean(raw._example),
+    example_label: raw._label ?? null,
+  };
+}
+
+/** Optional F14 reconcile VM — display only; never write cents into spending_align %. */
+export function mapOfficialAdminReconcile(
+  raw: OfficialAdminReconcile | null | undefined,
+): OfficialAdminReconcileVM | null {
+  if (!raw) return null;
+  return {
+    events_charged_cents_sum: raw.events_charged_cents_sum,
+    spend_overall_cents: raw.spend_overall_cents,
+    delta_cents: raw.delta_cents,
+    within_tol: raw.within_tol,
+    price_period_start: raw.price_period_start ?? null,
+    computed_at: raw.computed_at,
+  };
+}
+
 export interface MapInput {
   today: SpendSummary | null;
   rangeSummary: SpendSummary;
   series: DailySpendSeries | null;
   importMeta: ImportMeta | null;
   panelRange: PanelRangeKind;
+  /** Independent B-surface payload — never derived from rangeSummary notional $. */
+  spending_align?: SpendingAlign | null;
+  official_admin_reconcile?: OfficialAdminReconcile | null;
   load_state?: MiniPanelVM["load_state"];
   error?: MiniPanelVM["error"];
 }
@@ -171,6 +240,12 @@ export function mapToMiniPanelVM(input: MapInput): MiniPanelVM {
     input.rangeSummary.pricing_mode ??
     input.rangeSummary.cost_nature ??
     "notional_api_estimate";
+  // Hard rule: spending_align comes only from its own payload — never from notional $.
+  const spending_align = mapSpendingAlign(input.spending_align);
+  const official_admin_reconcile = mapOfficialAdminReconcile(
+    input.official_admin_reconcile,
+  );
+
   return {
     currency: input.rangeSummary.currency,
     today_total: input.today ? input.today.total : null,
@@ -198,5 +273,7 @@ export function mapToMiniPanelVM(input: MapInput): MiniPanelVM {
     fx_snapshot: input.rangeSummary.fx_snapshot,
     load_state: input.load_state ?? "idle",
     error: input.error,
+    spending_align,
+    official_admin_reconcile,
   };
 }

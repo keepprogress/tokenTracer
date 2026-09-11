@@ -135,8 +135,81 @@ export interface MiniPanelVM {
   fx_snapshot?: SpendSummary["fx_snapshot"];
   load_state: "idle" | "loading" | "error";
   error?: { code: string; message: string };
+  /** B-surface Spending align (AC F17–F19); null → none placeholder. Never from notional $. */
+  spending_align: SpendingAlignVM | null;
+  /** Optional F14 Admin reconcile (separate; do not map cents → pool %). */
+  official_admin_reconcile?: OfficialAdminReconcileVM | null;
 }
 
 /** Fallback when SpendSummary.disclaimer is absent (EN/ZH-safe). */
 export const DEFAULT_DISCLAIMER =
   "Notional API estimate — not an invoice; ≠ credit-card bill. / 名義估價，非帳單／≠信用卡帳單。";
+
+
+/* ——— AC v1.4 / UI-BIND v0.4-draft: Spending align (comparison layer) ——— */
+
+export type SpendingAlignSourceMode =
+  | "none"
+  | "manual_p1"
+  | "official_admin"
+  | "undocumented_opt_in";
+
+/** Wire payload — OPEN-BIND SpendingAlign (fixture / future `spend spending-align --json`). */
+export interface SpendingAlign {
+  schema_version?: "spending-align/v0" | string;
+  cursor_models_pct: number | null;
+  other_models_pct: number | null;
+  reset_label: string | null;
+  on_demand: string | null;
+  source_mode: SpendingAlignSourceMode;
+  partial: boolean;
+  partial_reason: string | null;
+  grok_bot_week_note: string | null;
+  computed_at?: string;
+  /** Fixture-only marker — never treat as live Spending. */
+  _example?: boolean;
+  _label?: string;
+}
+
+/** View-model for Expanded B surface — never derived from notional $ / by_usage_pool. */
+export interface SpendingAlignVM {
+  cursor_models_pct: number | null;
+  other_models_pct: number | null;
+  reset_label: string | null;
+  on_demand: string | null;
+  source_mode: SpendingAlignSourceMode;
+  partial: boolean;
+  partial_reason: string | null;
+  grok_bot_week_note: string | null;
+  /** True when payload is the bundled example fixture. */
+  is_example: boolean;
+  example_label: string | null;
+}
+
+/** F14 Admin reconcile — separate object; cents must not become B-surface pool %. */
+export interface OfficialAdminReconcile {
+  schema_version?: "official-admin-reconcile/v0" | string;
+  events_charged_cents_sum: number;
+  spend_overall_cents: number;
+  delta_cents: number;
+  within_tol: boolean;
+  price_period_start?: string;
+  computed_at: string;
+}
+
+export interface OfficialAdminReconcileVM {
+  events_charged_cents_sum: number;
+  spend_overall_cents: number;
+  delta_cents: number;
+  within_tol: boolean;
+  price_period_start: string | null;
+  computed_at: string;
+}
+
+/** Default F17 personal Ultra copy (語意不可弱化). */
+export const F17_PARTIAL_REASON =
+  "PARTIAL：無公開個人 usage API；兩池％為 Spending 對齊目標（手動／截圖），非本機 token 加總";
+
+/** B-surface compare disclaimer (F19 / N25). */
+export const SPENDING_COMPARE_DISCLAIMER =
+  "% 來自 Spending／手動／Admin 對照層；≠ A 區 notional token $；禁止假 Other model 列";

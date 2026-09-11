@@ -1,14 +1,27 @@
 /**
- * Shell-host IPC surface (SHELL-HOST v0.1).
+ * Shell-host IPC surface (SHELL-HOST v0.1 + UI-BIND v0.4-draft spending_align).
  *
  * Priority:
  * 1. Tauri `invoke` when `window.__TAURI__` is present (tokentracer-host)
  * 2. fetch `/api/ipc/*` (Vite spend-dev-bridge → real `spend` CLI)
  * 3. bundled `src/mock/*.json` fixtures
  *
+ * Spending align (B surface) is a **separate** payload from notional SpendSummary.
+ * Local notional totals MUST NOT drive spending % (AC N25 / F17).
+ * Until ledger ships `spend spending-align`, B surface uses OPEN-BIND fixture shape.
+ *
  * Command names match shell-host-contract-v0; UI never invents prices.
  */
-import type { Currency, DailySpendSeries, ImportMeta, PanelRangeKind, RangeKind, SpendSummary } from "./types";
+import type {
+  Currency,
+  DailySpendSeries,
+  ImportMeta,
+  OfficialAdminReconcile,
+  PanelRangeKind,
+  RangeKind,
+  SpendingAlign,
+  SpendSummary,
+} from "./types";
 
 import ledgerByModel from "./mock/ledger-by-model.json";
 import ledgerByPool from "./mock/ledger-by-pool.json";
@@ -22,12 +35,13 @@ import series7d from "./mock/spend-series-7d.json";
 import series30d from "./mock/spend-series-30d.json";
 import series90d from "./mock/spend-series-90d.json";
 import importStatusFixture from "./mock/import-status.json";
+import spendingAlignFixture from "./mock/spending-align-manual-p1.json";
 
 export type DataSource = "tauri" | "cli" | "fixture";
 
 let lastSource: DataSource = "fixture";
 
-/** Last successful IPC source. */
+/** Last successful IPC source (tauri / cli / fixture). */
 export function dataSource(): DataSource {
   return lastSource;
 }
@@ -196,12 +210,34 @@ export async function import_status(): Promise<ImportMeta> {
   return { ...(importStatusFixture as ImportMeta) };
 }
 
+/**
+ * B-surface: OPEN-BIND SpendingAlign JSON.
+ * Tries Tauri `spending_align` / `/api/ipc/spending_align`; else labeled fixture.
+ * Never invent % from notional / by_usage_pool.
+ */
+export async function spending_align(): Promise<SpendingAlign> {
+  const live = await tryLiveJson<SpendingAlign>("spending_align", {});
+  if (live) return live;
+  lastSource = "fixture";
+  return { ...(spendingAlignFixture as SpendingAlign) };
+}
+
+/**
+ * Optional F14 stub: only when host exposes reconcile IPC.
+ * UI must not map cents → SpendingAlign pool %. Returns null when absent.
+ */
+export async function official_admin_reconcile(): Promise<OfficialAdminReconcile | null> {
+  return tryLiveJson<OfficialAdminReconcile>("official_admin_reconcile", {});
+}
+
 export const mockApi = {
   spend_total,
   spend_by_model,
   spend_by_pool,
   spend_series,
   import_status,
+  spending_align,
+  official_admin_reconcile,
   dataSource,
   isTauriHost,
 };
