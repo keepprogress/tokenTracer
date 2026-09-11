@@ -16,4 +16,4 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 thiserror = "2"
 anyhow = "1"
 walkdir = "2"
-globset = "=0.4.14"  # rustc 1.85; 0.4.20 needs 1.88+
+globset = "=0.4.14"
