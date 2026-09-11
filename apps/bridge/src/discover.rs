@@ -182,8 +182,9 @@ fn scan_wsl_distro(
 }
 
 /// After probing via mount/UNC, rewrite root_path + id to
-/// `wsl:<Distro>:<posix-abs>` while keeping the probed path in meta.import_path
-/// and the posix path in meta.posix_path. Optional meta.unc_path for Win open.
+/// `wsl:<Distro>:<posix-abs>`. Default `meta.import_path` to the **posix** path
+/// (same as `meta.posix_path`) so WSL-side `spend import from-discover` works
+/// without remapping. Keep UNC in `meta.unc_path` / `meta.access_unc` for Win open.
 fn rewrite_wsl_canonical_ids(
     sources: &mut [DiscoverSource],
     mount_home: &Path,
@@ -207,7 +208,8 @@ fn rewrite_wsl_canonical_ids(
             }
 
             let mut meta = s.meta.take().unwrap_or_default();
-            meta.insert("import_path".into(), s.root_path.clone());
+            // Default import_path to posix so importers inside the distro need no remap.
+            meta.insert("import_path".into(), posix_root.clone());
             meta.insert("posix_path".into(), posix_root.clone());
             meta.insert("distro".into(), distro.to_string());
 

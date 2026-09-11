@@ -84,6 +84,11 @@ fn source_id_format_is_card_host_canonical_root() {
         meta.get("posix_path").map(String::as_str),
         Some("/home/t3261/.claude")
     );
+    assert_eq!(
+        meta.get("import_path").map(String::as_str),
+        Some("/home/t3261/.claude"),
+        "WSL import_path defaults to posix"
+    );
     assert!(meta.contains_key("unc_path") || meta.contains_key("access_unc"));
     // UNC must not be the sole id / root_path
     assert!(!wsl_claude.root_path.contains("wsl$"));
