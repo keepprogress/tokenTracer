@@ -1,5 +1,12 @@
 import "./style.css";
-import { spend_total, spend_series, import_status, dataSource } from "./api";
+import {
+  spend_total,
+  spend_by_pool,
+  spend_series,
+  import_status,
+  dataSource,
+  isTauriHost,
+} from "./api";
 import { mapToMiniPanelVM } from "./bind/mapToMiniPanelVM";
 import type { MiniPanelVM, PanelRangeKind, SpendSummary } from "./types";
 import { DEFAULT_DISCLAIMER } from "./types";
@@ -64,9 +71,11 @@ async function loadAll(nextRange: PanelRangeKind = range): Promise<void> {
   range = nextRange;
   render();
   try {
+    // today via spend_total; Expanded range via spend_by_pool so by_usage_pool /
+    // by_model land for AC-F7.2 (same CLI as Vite bridge — no invented prices).
     const [today, rangeSummary, series, meta] = await Promise.all([
       spend_total("today", "USD"),
-      spend_total(nextRange, "USD"),
+      spend_by_pool("USD", nextRange),
       spend_series("day", nextRange, "USD"),
       import_status(),
     ]);
@@ -274,14 +283,100 @@ function renderExpanded(): string {
           ${warns}
           <div>price_table ${escapeHtml(v?.price_table_version ?? "—")} · computed_at ${escapeHtml(v?.computed_at ?? "—")} (not import time)</div>
           <div class="footer-note">${
-            dataSource() === "cli"
-              ? "Live spend CLI (notional API estimate). UI does not price."
-              : "Ledger CLI fixtures fallback (notional API estimate). UI does not price."
+            dataSource() === "tauri"
+              ? "Tauri host invoke → spend CLI (notional API estimate). UI does not price."
+              : dataSource() === "cli"
+                ? "Live spend CLI via /api/ipc (notional API estimate). UI does not price. · debug only"
+                : "Ledger CLI fixtures fallback (notional API estimate). UI does not price."
           }</div>
         </div>
       </div>
     </div>
   `;
+}
+
+
+type TauriListen = (
+  event: string,
+  handler: (event: { payload: unknown }) => void,
+) => Promise<() => void>;
+
+function getTauriListen(): TauriListen | null {
+  if (typeof window === "undefined") return null;
+  const g = window as unknown as {
+    __TAURI__?: { event?: { listen?: TauriListen } };
+  };
+  return g.__TAURI__?.event?.listen?.bind(g.__TAURI__.event) ?? null;
+}
+
+function getTauriInvoke():
+  | ((cmd: string, args?: Record<string, unknown>) => Promise<unknown>)
+  | null {
+  if (typeof window === "undefined") return null;
+  const g = window as unknown as {
+    __TAURI__?: { core?: { invoke?: (c: string, a?: Record<string, unknown>) => Promise<unknown> } };
+  };
+  return g.__TAURI__?.core?.invoke?.bind(g.__TAURI__.core) ?? null;
+}
+
+/** Drive Collapsed/Expanded and notify host to resize window when embedded. */
+async function setMode(next: PanelMode, notifyHost = true): Promise<void> {
+  mode = next;
+  render();
+  if (!notifyHost || !isTauriHost()) return;
+  const invoke = getTauriInvoke();
+  if (!invoke) return;
+  try {
+    await invoke("set_panel_mode", { mode: next });
+  } catch {
+    /* host may already own the resize */
+  }
+}
+
+async function wireHostEvents(): Promise<void> {
+  if (!isTauriHost()) return;
+  document.documentElement.classList.add("host-tauri");
+  document.documentElement.dataset.host = "tauri";
+
+  const invoke = getTauriInvoke();
+  if (invoke) {
+    try {
+      const m = String(await invoke("get_panel_mode"));
+      if (m === "collapsed" || m === "expanded") {
+        mode = m;
+        render();
+      }
+    } catch {
+      /* ignore — host may not be ready */
+    }
+  }
+
+  const listen = getTauriListen();
+  if (!listen) return;
+  await listen("panel-set-mode", (e) => {
+    const raw = String(e.payload ?? "");
+    if (raw === "collapsed" || raw === "expanded") {
+      void setMode(raw, false);
+    } else if (raw === "hidden") {
+      /* window hidden by host; keep last UI mode */
+    }
+  });
+  await listen("panel-refresh", () => {
+    void loadAll(range);
+  });
+  await listen("panel-import-stub", () => {
+    const inv = getTauriInvoke();
+    if (!inv) {
+      console.info("[tokenTracer] Import… stub (no invoke)");
+      return;
+    }
+    void inv("import_run")
+      .then(() => loadAll(range))
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.info("[tokenTracer] import_run stub:", msg);
+      });
+  });
 }
 
 function escapeHtml(s: string): string {
@@ -309,11 +404,9 @@ app.addEventListener("click", (ev) => {
 
   const action = actionEl?.dataset.action ?? (t.closest(".collapsed") ? "expand" : null);
   if (action === "expand") {
-    mode = "expanded";
-    render();
+    void setMode("expanded");
   } else if (action === "collapse") {
-    mode = "collapsed";
-    render();
+    void setMode("collapsed");
   } else if (action === "refresh") {
     void loadAll(range);
   }
@@ -321,14 +414,13 @@ app.addEventListener("click", (ev) => {
 
 app.addEventListener("keydown", (ev) => {
   if (ev.key === "Escape" && mode === "expanded") {
-    mode = "collapsed";
-    render();
+    void setMode("collapsed");
   }
   if ((ev.key === "Enter" || ev.key === " ") && (ev.target as HTMLElement).closest(".collapsed")) {
     ev.preventDefault();
-    mode = "expanded";
-    render();
+    void setMode("expanded");
   }
 });
 
+void wireHostEvents();
 void loadAll("all");

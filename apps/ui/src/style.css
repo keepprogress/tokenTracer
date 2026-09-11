@@ -319,3 +319,31 @@ html, body {
   border-radius: 6px;
   padding: 8px;
 }
+
+
+/* --- Tauri host embed (frameless mini-panel; not full-page web) --- */
+html.host-tauri,
+html.host-tauri body {
+  background: transparent;
+  overflow: hidden;
+}
+html.host-tauri #app {
+  min-height: 100vh;
+  height: 100vh;
+  padding: 0;
+  margin: 0;
+  align-items: stretch;
+  justify-content: stretch;
+  background: transparent;
+}
+html.host-tauri .panel {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  border-radius: 10px;
+  box-shadow: none;
+}
+html.host-tauri .panel.expanded .body {
+  max-height: calc(100vh - 44px);
+  overflow-y: auto;
+}

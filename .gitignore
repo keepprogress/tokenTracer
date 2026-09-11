@@ -8,3 +8,6 @@ preview-*.png
 
 # Allow documented screenshots
 !docs/screenshots/**/*.png
+
+# Allow Tauri host tray / bundle icons
+!apps/tokenTracer-host/icons/**/*.png

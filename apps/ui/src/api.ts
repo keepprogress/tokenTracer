@@ -1,12 +1,12 @@
 /**
- * Shell-host IPC surface (SHELL-HOST v0).
+ * Shell-host IPC surface (SHELL-HOST v0.1).
  *
- * Primary path (dev / vite preview): fetch `/api/ipc/*` which shells out to the
- * real `spend` CLI via `scripts/spend-dev-bridge.mjs` — no invented prices.
- * Fallback: bundled `src/mock/*.json` from `refresh-from-ledger.sh` when CLI /
- * bridge is unavailable (static build, Tauri-not-ready, FORCE_FIXTURES).
+ * Priority:
+ * 1. Tauri `invoke` when `window.__TAURI__` is present (tokentracer-host)
+ * 2. fetch `/api/ipc/*` (Vite spend-dev-bridge → real `spend` CLI)
+ * 3. bundled `src/mock/*.json` fixtures
  *
- * Command names match shell-host-contract-v0; Tauri host will swap to `invoke`.
+ * Command names match shell-host-contract-v0; UI never invents prices.
  */
 import type { Currency, DailySpendSeries, ImportMeta, PanelRangeKind, RangeKind, SpendSummary } from "./types";
 
@@ -23,11 +23,11 @@ import series30d from "./mock/spend-series-30d.json";
 import series90d from "./mock/spend-series-90d.json";
 import importStatusFixture from "./mock/import-status.json";
 
-export type DataSource = "cli" | "fixture";
+export type DataSource = "tauri" | "cli" | "fixture";
 
 let lastSource: DataSource = "fixture";
 
-/** Last successful IPC source (cli = live spend bridge, fixture = static mock). */
+/** Last successful IPC source. */
 export function dataSource(): DataSource {
   return lastSource;
 }
@@ -51,6 +51,40 @@ const SERIES: Record<PanelRangeKind, DailySpendSeries> = {
 
 const IPC_BASE = "/api/ipc";
 
+type TauriInvoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
+
+function getTauriInvoke(): TauriInvoke | null {
+  if (typeof window === "undefined") return null;
+  const g = window as unknown as {
+    __TAURI__?: { core?: { invoke?: TauriInvoke }; invoke?: TauriInvoke };
+    __TAURI_INTERNALS__?: { invoke?: TauriInvoke };
+  };
+  // Tauri 2 withGlobalTauri → __TAURI__.core.invoke
+  if (g.__TAURI__?.core?.invoke) return g.__TAURI__.core.invoke.bind(g.__TAURI__.core);
+  if (g.__TAURI__?.invoke) return g.__TAURI__.invoke.bind(g.__TAURI__);
+  if (g.__TAURI_INTERNALS__?.invoke) return g.__TAURI_INTERNALS__.invoke.bind(g.__TAURI_INTERNALS__);
+  return null;
+}
+
+export function isTauriHost(): boolean {
+  return getTauriInvoke() !== null;
+}
+
+async function tryTauriInvoke<T>(
+  command: string,
+  args: Record<string, unknown> = {},
+): Promise<T | null> {
+  const invoke = getTauriInvoke();
+  if (!invoke) return null;
+  try {
+    const data = (await invoke(command, args)) as T;
+    lastSource = "tauri";
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 function cloneSummary(base: SpendSummary, currency: Currency): SpendSummary {
   return {
     ...base,
@@ -66,7 +100,12 @@ async function tryLiveJson<T>(
   command: string,
   query: Record<string, string>,
 ): Promise<T | null> {
-  // File:// / Tauri without host: relative /api/ipc is meaningless.
+  // Prefer Tauri host invoke (embedded webview / no Vite middleware).
+  const tauriArgs: Record<string, unknown> = { ...query };
+  const viaTauri = await tryTauriInvoke<T>(command, tauriArgs);
+  if (viaTauri) return viaTauri;
+
+  // File:// without host: relative /api/ipc is meaningless.
   if (typeof window !== "undefined" && window.location?.protocol === "file:") {
     return null;
   }
@@ -164,4 +203,5 @@ export const mockApi = {
   spend_series,
   import_status,
   dataSource,
+  isTauriHost,
 };

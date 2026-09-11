@@ -1,0 +1,15 @@
+[[permission]]
+identifier = "allow-host-ipc"
+description = "SHELL-HOST v0.1 IPC + panel shell commands for the mini-panel webview"
+commands.allow = [
+  "spend_total",
+  "spend_series",
+  "spend_by_model",
+  "spend_by_pool",
+  "import_status",
+  "discover",
+  "import_run",
+  "get_panel_mode",
+  "set_panel_mode",
+  "host_meta",
+]
