@@ -7,9 +7,9 @@ use pricing::parsers::{
     parse_claude_code_jsonl_with_source, parse_codex_rollout_jsonl_with_source, parse_cursor_local,
 };
 use pricing::{
-    daily_spend_series, filter_events_by_range, price_with_range, read_import_meta, record_import,
-    AgentId, Currency, DayBoundary, FxSnapshot, PriceTable, RangeFilterOpts, RangeKind,
-    SeriesOpts, UsageEvent,
+    daily_spend_series, filter_events_by_range, import_from_discover, price_with_range,
+    read_import_meta, record_import, AgentId, Currency, DayBoundary, FromDiscoverOpts, FxSnapshot,
+    PriceTable, RangeFilterOpts, RangeKind, SeriesOpts, UsageEvent,
 };
 use std::io::{self, Read};
 use std::path::PathBuf;
@@ -152,6 +152,26 @@ enum ImportCmd {
         parse_error_count: u64,
         #[arg(long)]
         source_id: Vec<String>,
+        #[arg(long, default_value_t = true)]
+        json: bool,
+    },
+    /// Import from bridge DiscoverResult JSON (path-list-v0.2).
+    FromDiscover {
+        /// Path to DiscoverResult JSON (e.g. from `tokentracer-bridge discover --json`).
+        #[arg(long)]
+        discover: PathBuf,
+        /// File-list / local-expand cap. `0` = unlimited (recommended for full import).
+        #[arg(long, default_value = "0")]
+        limit: u64,
+        #[arg(long, default_value = ".token-tracer/import-meta.json")]
+        state: PathBuf,
+        /// Write UsageEvent JSON array to this path.
+        #[arg(long)]
+        events_out: Option<PathBuf>,
+        /// Write ImportReport JSON to this path (also printed when --json).
+        #[arg(long)]
+        report_out: Option<PathBuf>,
+        /// Print ImportReport JSON to stdout (default true for from-discover).
         #[arg(long, default_value_t = true)]
         json: bool,
     },
@@ -466,6 +486,37 @@ fn main() -> Result<()> {
                     Some(state.display().to_string()),
                 )?;
                 println!("{}", serde_json::to_string_pretty(&meta)?);
+            }
+            ImportCmd::FromDiscover {
+                discover,
+                limit,
+                state,
+                events_out,
+                report_out,
+                json,
+            } => {
+                let result = import_from_discover(&FromDiscoverOpts {
+                    discover_path: discover,
+                    limit,
+                    state_path: state,
+                    events_out,
+                    report_out,
+                })?;
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&result.report)?);
+                } else if result.report.events_path.is_none() {
+                    // No --events-out: emit events then report note on stderr
+                    println!("{}", serde_json::to_string_pretty(&result.events)?);
+                    eprintln!(
+                        "import: upserted={} parse_errors={} truncated={}",
+                        result.report.events_upserted,
+                        result.report.parse_error_count,
+                        result.report.truncated_sources.len()
+                    );
+                }
+                if result.exit_nonzero {
+                    std::process::exit(2);
+                }
             }
         },
     }

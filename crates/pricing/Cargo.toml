@@ -17,6 +17,8 @@ clap = { workspace = true }
 chrono = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
+walkdir = { workspace = true }
+globset = { workspace = true }
 
 [lib]
 name = "pricing"

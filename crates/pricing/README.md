@@ -45,6 +45,47 @@ cargo run -p pricing --bin spend -- parse --agent codex \
 Paths above assume cwd = `crates/pricing`. From workspace root use
 `fixtures/ac-v1/events.json` instead.
 
+
+
+## Import from bridge discover (path-list-v0.2)
+
+E2E POC with `tokentracer-bridge` fixtures:
+
+```bash
+# 1) Emit DiscoverResult
+cd /workspace/tokenTracer-bridge
+cargo run -q -- discover --json --fixture tests/fixtures > /tmp/discover.json
+
+# 2) Import into ledger events + ImportMeta
+cd /home/box/agent-data/projects/token-spend-tracker
+cargo run -q -p pricing --bin spend -- import from-discover \
+  --discover /tmp/discover.json \
+  --limit 0 \
+  --state /tmp/tt-import-meta.json \
+  --events-out /tmp/tt-events.json \
+  --report-out /tmp/tt-import-report.json \
+  --json
+```
+
+CLI flags:
+
+| Flag | Meaning |
+|------|---------|
+| `--discover` | Path to DiscoverResult JSON |
+| `--limit` | Local expand / files cap; **`0` = unlimited** (use for full import) |
+| `--state` | ImportMeta state file (default `.token-tracer/import-meta.json`) |
+| `--events-out` | Write UsageEvent JSON array |
+| `--report-out` | Write ImportReport JSON |
+| `--json` | Print ImportReport to stdout |
+
+Behavior notes:
+
+- Walks `sources` where `readable && status ∈ {ok, partial}`.
+- Truncated `files[]` (`truncated: true` / **TT-F2-006**) is **never** treated as complete — raise `--limit` or use `--limit 0`.
+- `claude_code` / `codex` → existing JSONL parsers; `UsageEvent.source = source.id`, `meta.host_os = source.host`.
+- `cursor` → skipped for local billing (`cursor_skipped_local_billing`); no bubble `tokenCount` events.
+- WSL roots: prefer `meta.import_path` / `meta.posix_path`, else strip `wsl:<Distro>:` on Linux hosts.
+
 ## Price table sources
 
 Embedded version `2026-09-11.v2` (`data/price_table_2026-09-11.v2.json`):
