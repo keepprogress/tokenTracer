@@ -34,15 +34,14 @@ Mapping rules (AC-F14 / F19):
 - `meta.cursor_source_mode = official_admin`
 - `usage_pool` from `tier` when present (PARTIAL community map)
 
-## Files
+## Credential contract (align bridge)
 
-| file | purpose |
-|------|---------|
-| `admin-events.json` | S1-shaped `filtered-usage-events` sample |
-| `admin-spend.json` | S2-shaped `/teams/spend` sample (Σ aligns) |
-| `admin-reconcile.expected.json` | Expected `ReconcileReport` fields |
+Live Admin fetch (optional; not required for tests) uses env
+`TOKENTRACER_CURSOR_ADMIN_API_KEY` (same as bridge `cursor_admin`).
+Pricing/bridge do **not** invent secret storage. Missing key → clear error
+(`TT-C14-MISSING-KEY` semantics); fixture reconcile needs no key.
 
-## Verify (no Admin key; fixture-only)
+## Verify (fixture-only)
 
 ```bash
 cargo run -p pricing --bin spend -- cursor official-reconcile \
@@ -51,7 +50,3 @@ cargo run -p pricing --bin spend -- cursor official-reconcile \
 
 cargo test -p pricing --test ac_v1_4_cursor_official
 ```
-
-Live Admin fetch (optional, not required for tests) needs Team Admin API key via
-env `CURSOR_ADMIN_API_KEY` (Basic username; empty password). Bridge does **not**
-store this key — pass at call time only. Missing key → clear error, no silent fallback.

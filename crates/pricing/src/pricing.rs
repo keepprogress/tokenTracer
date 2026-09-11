@@ -37,6 +37,7 @@ pub fn event_notional_usd(event: &UsageEvent, table: &PriceTable) -> Option<f64>
     Some(usd)
 }
 
+
 fn is_vendor_reported(event: &UsageEvent) -> bool {
     event
         .meta
@@ -44,6 +45,34 @@ fn is_vendor_reported(event: &UsageEvent) -> bool {
         .and_then(|m| m.get("cost_nature"))
         .and_then(|v| v.as_str())
         == Some("vendor_reported")
+}
+
+/// True when event is Cursor official_admin (AC-F14).
+pub fn is_cursor_official_admin_event(event: &UsageEvent) -> bool {
+    if !matches!(event.agent, AgentId::Cursor) {
+        return false;
+    }
+    let mode = event
+        .meta
+        .as_ref()
+        .and_then(|m| m.get("cursor_source_mode"))
+        .and_then(|v| v.as_str());
+    mode == Some(CursorSourceMode::OfficialAdmin.as_str())
+        || (is_vendor_reported(event) && event.source.contains("EC-cursor-official-api-v1"))
+}
+
+/// Cursor events that are local enrichment — not official_admin / vendor_reported (AC-F15).
+pub fn is_cursor_local_enrichment_event(event: &UsageEvent) -> bool {
+    if !matches!(event.agent, AgentId::Cursor) {
+        return false;
+    }
+    if is_cursor_official_admin_event(event) {
+        return false;
+    }
+    if is_vendor_reported(event) {
+        return false;
+    }
+    true
 }
 
 /// (amount_usd, used_vendor_reported, unknown_model).
@@ -198,7 +227,17 @@ pub fn price_with_range(
             .or_insert_with(|| (ev.agent.clone(), 0.0, default_status(&ev.agent)));
         entry.1 += agent_add;
         if matches!(ev.agent, AgentId::Cursor) {
-            entry.2 = AgentSpendStatus::Partial;
+            // F15: local enrichment stays partial. F14 official_admin/vendor_reported → Ok
+            // unless any local enrichment cursor event is also present (mixed → partial).
+            if is_cursor_local_enrichment_event(ev) {
+                entry.2 = AgentSpendStatus::Partial;
+            } else if is_cursor_official_admin_event(ev) || is_vendor_reported(ev) {
+                if entry.2 != AgentSpendStatus::Partial {
+                    entry.2 = AgentSpendStatus::Ok;
+                }
+            } else {
+                entry.2 = AgentSpendStatus::Partial;
+            }
         }
 
         let mk = (ev.agent.as_str().to_string(), mkey.clone());
@@ -373,6 +412,58 @@ pub fn price_with_range(
         end: None,
     }));
 
+    // AC-F15: strengthen disclaimer when Cursor is local-enrichment-only.
+    let cursor_events: Vec<_> = events
+        .iter()
+        .filter(|e| matches!(e.agent, AgentId::Cursor))
+        .collect();
+    let cursor_only_local = !cursor_events.is_empty()
+        && cursor_events
+            .iter()
+            .all(|e| is_cursor_local_enrichment_event(e));
+    let cursor_has_local = cursor_events
+        .iter()
+        .any(|e| is_cursor_local_enrichment_event(e));
+    let only_cursor = !events.is_empty()
+        && events.iter().all(|e| matches!(e.agent, AgentId::Cursor));
+
+    let mut disclaimer = NOTIONAL_DISCLAIMER.to_string();
+    if cursor_only_local || (only_cursor && cursor_has_local) {
+        disclaimer = format!("{disclaimer} {CURSOR_LOCAL_ONLY_DISCLAIMER}");
+    }
+
+    // Ensure cursor by_agent stays Partial when any local enrichment present.
+    let by_agent: Vec<AgentSpend> = by_agent
+        .into_iter()
+        .map(|mut a| {
+            if a.agent == AgentId::Cursor && cursor_has_local {
+                a.status = AgentSpendStatus::Partial;
+            }
+            a
+        })
+        .collect();
+
+    let mut meta = meta;
+    if cursor_only_local || (only_cursor && cursor_has_local) {
+        let extra = serde_json::json!({
+            "cursor_source_mode": CursorSourceMode::LocalEnrichment.as_str(),
+            "cursor_authoritative_invoice_usd": false,
+            "note": "Cursor local enrichment is PARTIAL; not sole authoritative invoice USD"
+        });
+        meta = Some(match meta {
+            Some(serde_json::Value::Object(mut m)) => {
+                if let serde_json::Value::Object(e) = extra {
+                    for (k, v) in e {
+                        m.insert(k, v);
+                    }
+                }
+                serde_json::Value::Object(m)
+            }
+            Some(other) => serde_json::json!({"prior": other, "cursor": extra}),
+            None => extra,
+        });
+    }
+
     SpendSummary {
         currency,
         total,
@@ -382,7 +473,7 @@ pub fn price_with_range(
         unpriced_tokens,
         price_table_version: price_table.version.clone(),
         pricing_mode: PricingMode::NotionalApiEstimate,
-        disclaimer: NOTIONAL_DISCLAIMER.to_string(),
+        disclaimer,
         fx_snapshot: fx_out,
         range,
         computed_at: Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true),

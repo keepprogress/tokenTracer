@@ -7,9 +7,11 @@ use pricing::parsers::{
     parse_claude_code_jsonl_with_source, parse_codex_rollout_jsonl_with_source, parse_cursor_local,
 };
 use pricing::{
-    daily_spend_series, filter_events_by_range, import_from_discover, price_with_range,
-    read_import_meta, record_import, AgentId, Currency, DayBoundary, FromDiscoverOpts, FxSnapshot,
-    PriceTable, RangeFilterOpts, RangeKind, SeriesOpts, UsageEvent,
+    daily_spend_series, filter_events_by_range, import_from_discover, parse_admin_filtered_usage_events,
+    parse_teams_spend, price_with_range, read_import_meta, reconcile_charged_cents, record_import,
+    require_admin_api_key, AgentId, Currency, CursorOfficialConfig, DayBoundary, FromDiscoverOpts,
+    FxSnapshot, PriceTable, RangeFilterOpts, RangeKind, SeriesOpts, UsageEvent,
+    CURSOR_ADMIN_API_KEY_ENV, UNDOCUMENTED_DASHBOARD_BANNER,
 };
 use std::io::{self, Read};
 use std::path::PathBuf;
@@ -130,6 +132,11 @@ enum Commands {
         #[command(subcommand)]
         cmd: ImportCmd,
     },
+    /// Cursor official Admin / Spending align (AC v1.4) — ledger only.
+    Cursor {
+        #[command(subcommand)]
+        cmd: CursorCmd,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -174,6 +181,29 @@ enum ImportCmd {
         /// Print ImportReport JSON to stdout (default true for from-discover).
         #[arg(long, default_value_t = true)]
         json: bool,
+    },
+}
+
+
+#[derive(Subcommand, Debug)]
+enum CursorCmd {
+    /// Reconcile Σ chargedCents ↔ /teams/spend (fixture-first; AC-F14).
+    OfficialReconcile {
+        /// Path to Admin filtered-usage-events JSON fixture.
+        #[arg(long)]
+        events: PathBuf,
+        /// Path to Admin /teams/spend JSON fixture.
+        #[arg(long)]
+        spend: PathBuf,
+        /// Also write mapped UsageEvent JSON array to this path.
+        #[arg(long)]
+        events_out: Option<PathBuf>,
+    },
+    /// Show clear error when Admin key missing; refuse silent local fallback.
+    OfficialFetchCheck {
+        /// If set, also print undocumented_dashboard default (must be false).
+        #[arg(long, default_value_t = true)]
+        show_config: bool,
     },
 }
 
@@ -516,6 +546,61 @@ fn main() -> Result<()> {
                 }
                 if result.exit_nonzero {
                     std::process::exit(2);
+                }
+            }
+        },
+        Commands::Cursor { cmd } => match cmd {
+            CursorCmd::OfficialReconcile {
+                events,
+                spend,
+                events_out,
+            } => {
+                let events_text = std::fs::read_to_string(&events)
+                    .with_context(|| format!("read events {}", events.display()))?;
+                let spend_text = std::fs::read_to_string(&spend)
+                    .with_context(|| format!("read spend {}", spend.display()))?;
+                let mapped = parse_admin_filtered_usage_events(&events_text)
+                    .map_err(|e| anyhow::anyhow!(e))?;
+                let snap = parse_teams_spend(&spend_text).map_err(|e| anyhow::anyhow!(e))?;
+                let report = reconcile_charged_cents(&mapped, &snap);
+                if let Some(out) = events_out {
+                    std::fs::write(&out, serde_json::to_string_pretty(&mapped)?)
+                        .with_context(|| format!("write {}", out.display()))?;
+                }
+                println!("{}", serde_json::to_string_pretty(&report)?);
+                if !report.matched {
+                    eprintln!(
+                        "reconcile NOT matched: delta_usd={} tol={}",
+                        report.delta_usd, report.tolerance_usd
+                    );
+                    std::process::exit(2);
+                }
+            }
+            CursorCmd::OfficialFetchCheck { show_config } => {
+                if show_config {
+                    let cfg = CursorOfficialConfig::default();
+                    eprintln!(
+                        "undocumented_dashboard default = {} (must stay false unless opt-in)",
+                        cfg.undocumented_dashboard
+                    );
+                    eprintln!(
+                        "credential contract: env {CURSOR_ADMIN_API_KEY_ENV} at call time only;                          same as bridge cursor_admin — do not invent secret storage"
+                    );
+                    eprintln!("{UNDOCUMENTED_DASHBOARD_BANNER}");
+                }
+                match require_admin_api_key() {
+                    Ok(_) => {
+                        println!(
+                            "{{\"ok\":true,\"note\":\"key present; live HTTP not enabled in this build — use official-reconcile with fixtures\"}}"
+                        );
+                    }
+                    Err(e) => {
+                        eprintln!("{e}");
+                        println!(
+                            "{{\"ok\":false,\"error\":\"admin_key_missing\",\"code\":\"TT-C14-MISSING-KEY\",\"env\":\"{CURSOR_ADMIN_API_KEY_ENV}\"}}"
+                        );
+                        std::process::exit(2);
+                    }
                 }
             }
         },
