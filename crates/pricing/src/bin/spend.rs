@@ -2,22 +2,26 @@
 
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use pricing::parsers::{
     parse_claude_code_jsonl_with_source, parse_codex_rollout_jsonl_with_source, parse_cursor_local,
 };
 use pricing::{
-    daily_spend_series, filter_events_by_range, import_from_discover, parse_admin_filtered_usage_events,
-    parse_teams_spend, price_with_range, read_import_meta, reconcile_charged_cents, record_import,
-    require_admin_api_key, AgentId, Currency, CursorOfficialConfig, DayBoundary, FromDiscoverOpts,
-    FxSnapshot, PriceTable, RangeFilterOpts, RangeKind, SeriesOpts, UsageEvent,
-    CURSOR_ADMIN_API_KEY_ENV, UNDOCUMENTED_DASHBOARD_BANNER,
+    daily_spend_series, filter_events_by_range, import_from_discover,
+    parse_admin_filtered_usage_events, parse_teams_spend, price_with_range, read_import_meta,
+    read_spending_align, reconcile_charged_cents, record_import, require_admin_api_key,
+    set_spending_align_from_json, AgentId, Currency, CursorOfficialConfig, DayBoundary,
+    FromDiscoverOpts, FxSnapshot, PriceTable, RangeFilterOpts, RangeKind, SeriesOpts, UsageEvent,
+    CURSOR_ADMIN_API_KEY_ENV, DEFAULT_SPENDING_ALIGN_STATE, UNDOCUMENTED_DASHBOARD_BANNER,
 };
 use std::io::{self, Read};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
-#[command(name = "spend", about = "tokenTracer spend CLI (notional API estimate)")]
+#[command(
+    name = "spend",
+    about = "tokenTracer spend CLI (notional API estimate)"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -137,6 +141,9 @@ enum Commands {
         #[command(subcommand)]
         cmd: CursorCmd,
     },
+    /// SpendingAlign comparison layer (OPEN-BIND / AC-F17). Not notional / not Admin cents.
+    #[command(name = "spending-align")]
+    SpendingAlign(SpendingAlignCli),
 }
 
 #[derive(Subcommand, Debug)]
@@ -184,6 +191,31 @@ enum ImportCmd {
     },
 }
 
+#[derive(Args, Debug)]
+#[command(args_conflicts_with_subcommands = true)]
+struct SpendingAlignCli {
+    #[command(subcommand)]
+    cmd: Option<SpendingAlignCmd>,
+    /// Ledger-side state file (separate from ImportMeta).
+    #[arg(long, default_value = DEFAULT_SPENDING_ALIGN_STATE)]
+    state: PathBuf,
+    /// Always JSON; flag accepted for OPEN-BIND / UI-BIND symmetry.
+    #[arg(long, default_value_t = true)]
+    json: bool,
+}
+
+#[derive(Subcommand, Debug)]
+enum SpendingAlignCmd {
+    /// Write a validated manual_p1 SpendingAlign payload to the state file.
+    Set {
+        /// Path to OPEN-BIND SpendingAlign JSON.
+        #[arg(long, value_name = "FILE")]
+        json: PathBuf,
+        /// Ledger-side state file (separate from ImportMeta).
+        #[arg(long, default_value = DEFAULT_SPENDING_ALIGN_STATE)]
+        state: PathBuf,
+    },
+}
 
 #[derive(Subcommand, Debug)]
 enum CursorCmd {
@@ -280,7 +312,11 @@ fn read_events(path: Option<&PathBuf>) -> Result<Vec<UsageEvent>> {
     Ok(events)
 }
 
-fn build_fx(currency: &CurrencyArg, fx_rate: Option<f64>, fx_source: String) -> Result<Option<FxSnapshot>> {
+fn build_fx(
+    currency: &CurrencyArg,
+    fx_rate: Option<f64>,
+    fx_source: String,
+) -> Result<Option<FxSnapshot>> {
     match (currency, fx_rate) {
         (CurrencyArg::Twd, Some(rate)) => Ok(Some(FxSnapshot {
             pair: "USD/TWD".into(),
@@ -602,6 +638,27 @@ fn main() -> Result<()> {
                         std::process::exit(2);
                     }
                 }
+            }
+        },
+        Commands::SpendingAlign(SpendingAlignCli {
+            cmd,
+            state,
+            json: _,
+        }) => match cmd {
+            None => {
+                let align = read_spending_align(&state)?;
+                println!("{}", serde_json::to_string_pretty(&align)?);
+            }
+            Some(SpendingAlignCmd::Set {
+                json: json_file,
+                state: set_state,
+            }) => {
+                let text = std::fs::read_to_string(&json_file)
+                    .with_context(|| format!("read spending-align JSON {}", json_file.display()))?;
+                let align = set_spending_align_from_json(&set_state, &text).with_context(|| {
+                    format!("write spending-align state {}", set_state.display())
+                })?;
+                println!("{}", serde_json::to_string_pretty(&align)?);
             }
         },
     }

@@ -27,9 +27,11 @@
 
 Σ chargedCents ↔ spend overall; abs tol **$0.01**.
 
-### `SpendingAlignSummary` (F17) — comparison layer, **not** UsageEvent
+### `SpendingAlign` (F17 / OPEN-BIND) — comparison layer, **not** UsageEvent
 
-`cursor_models_percent`, `other_models_percent`, `reset_note`, `on_demand`, partial flags.
+Wire JSON: `schema_version=spending-align/v0`, `cursor_models_pct`, `other_models_pct`, `reset_label`, `on_demand` (string), `source_mode` ∈ {`none`,`manual_p1`,`official_admin`,`undocumented_opt_in`}, `partial` / `partial_reason`, `grok_bot_week_note`, `computed_at`.
+
+`SpendingAlignSummary` remains the earlier F17 sketch (`*_percent` / structured `on_demand`). CLI / UI consume `SpendingAlign`. `local_enrichment` is **not** a `source_mode`.
 
 ### Config
 
@@ -51,9 +53,12 @@ Optional HTTP behind trait; tests use fixtures only.
 spend cursor official-reconcile --events fixtures/ac-v1.4/admin-events.json \
   --spend fixtures/ac-v1.4/admin-spend.json
 spend cursor official-fetch-check   # clear error if no Admin key
+spend spending-align --json [--state .token-tracer/spending-align.json]
+spend spending-align set --json fixtures/ac-v1.4/spending-align-manual-p1.json
 ```
 
 Credential: env `TOKENTRACER_CURSOR_ADMIN_API_KEY` (bridge-aligned). No secret store.
+SpendingAlign % is **not** the Admin key contract.
 
 ## 5. F15 local enrichment guard
 

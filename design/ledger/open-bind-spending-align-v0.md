@@ -46,11 +46,13 @@ OfficialAdminReconcile {
 **CLI：**
 ```bash
 spend spending-align --json [--state <path>]     # 讀／印 SpendingAlign
-spend spending-align set --json <file>           # manual_p1 寫入（見 S2）
+spend spending-align set --json <file> [--state <path>]  # manual_p1 寫入（見 S2）
 spend cursor official-reconcile --events … --spend …   # F14 fixture／檔案對帳
 ```
 
-Team Admin 對帳結果走 `OfficialAdminReconcile`；**不**把 Σ chargedCents 寫進 `cursor_models_pct`。
+預設 `--state` = `.token-tracer/spending-align.json`（與 ImportMeta 分離）。缺檔讀取 → `source_mode=none` 佔位（pct 全 `null`、`partial=true`、reason 說明尚無對照資料／F17）；**禁止**從 notional `SpendSummary`／`by_usage_pool.amount` 推算％。`set` 只接受 `source_mode=manual_p1`，校驗 schema 後原子寫入並重蓋 `computed_at`。
+
+Team Admin 對帳結果走 `OfficialAdminReconcile`；**不**把 Σ chargedCents 寫進 `cursor_models_pct`。`local_enrichment` **不得**出現在 `SpendingAlign.source_mode`。憑證契約（`TOKENTRACER_CURSOR_ADMIN_API_KEY`／`TT-C14-*`）與此％對照層無關。
 
 ---
 

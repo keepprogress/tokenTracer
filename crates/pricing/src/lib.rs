@@ -2,7 +2,7 @@
 //!
 //! Pure pricing is isolated from I/O: parsers read bytes/strings; `price(...)`
 //! never touches the filesystem. Range filtering and daily series are also pure.
-//! `import_meta` and `import` intentionally perform file I/O (state + discover).
+//! `import_meta`, `import`, and `spending_align` intentionally perform file I/O.
 //! AC v1.4 official Admin parse/reconcile is pure JSON (fixture-first).
 
 pub mod cursor_official;
@@ -14,18 +14,19 @@ pub mod price_table;
 pub mod pricing;
 pub mod range;
 pub mod series;
+pub mod spending_align;
 pub mod timeutil;
 
 pub use cursor_official::{
     gate_undocumented_dashboard, parse_admin_filtered_usage_events, parse_teams_spend,
     reconcile_charged_cents, reconcile_charged_cents_with_tol, require_admin_api_key,
-    sum_charged_cents, AdminApiClient, CursorOfficialError, EnvAdminApiClient,
-    CODE_MISSING_KEY, SOURCE_TAG as CURSOR_OFFICIAL_SOURCE_TAG,
+    sum_charged_cents, AdminApiClient, CursorOfficialError, EnvAdminApiClient, CODE_MISSING_KEY,
+    SOURCE_TAG as CURSOR_OFFICIAL_SOURCE_TAG,
 };
 pub use import::{
-    import_from_discover, import_from_discover_result, load_discover_result, DiscoverError,
-    DiscoverResult, DiscoverSource, FileListResult, FromDiscoverOpts, FromDiscoverResult,
-    ImportError, ImportReport, scope_event_id,
+    import_from_discover, import_from_discover_result, load_discover_result, scope_event_id,
+    DiscoverError, DiscoverResult, DiscoverSource, FileListResult, FromDiscoverOpts,
+    FromDiscoverResult, ImportError, ImportReport,
 };
 pub use import_meta::{read_import_meta, record_import, write_import_meta};
 pub use models::*;
@@ -36,3 +37,8 @@ pub use pricing::{
 };
 pub use range::{filter_events_by_range, resolve_window, RangeFilterOpts, ResolvedWindow};
 pub use series::{daily_spend_series, SeriesOpts};
+pub use spending_align::{
+    default_spending_align_state_path, parse_spending_align_json, read_spending_align,
+    set_spending_align_from_json, validate_spending_align, validate_spending_align_for_set,
+    write_spending_align, SpendingAlignError,
+};
