@@ -68,7 +68,7 @@
 | Win-native importer 進程 | **可關 UNTESTED**（帳本已對核；規格不自 PASS） |
 | OPEN-F3-DEDUP | 開（wsl2 34135→12596） |
 | Stopped Ubuntu | UNTESTED |
-| F7′／F10 | 進行中／HOLD |
+| F7′／F10 | F7′ 進行中；**F10 優先 HOLD 已解除**（2026-09-11；閘門仍＝已核 v1.2／v1.2b） |
 
 ---
 
