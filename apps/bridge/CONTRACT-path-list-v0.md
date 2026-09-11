@@ -26,7 +26,8 @@
 |---------|-----------|
 | Library | `discover_paths(config) -> DiscoverResult` |
 | Library expand | `list_files_for_source(config, source_id, limit) -> FileListResult` |
-| CLI | `tokentracer-bridge discover --json [--fixture DIR] [--list-files]` |
+| CLI | `tokentracer-bridge discover --json [--fixture DIR] [--list-files] [--win-user-profile PATH] [--win-appdata PATH] [--macos-home PATH]` |
+| CLI live defaults | Without `--fixture`: Windows → `USERPROFILE`/`APPDATA` for Win roots; macOS → `HOME`. Live WSL resolves `$USER`/`$HOME` per distro into `\\wsl$\<Distro>\home\<user>` (never invents `unknown`). |
 | CLI expand | `tokentracer-bridge files --source-id <id> [--limit N] [--fixture DIR]` |
 
 **Default discover:** returns `root_path` + `glob` + `file_count` only.  

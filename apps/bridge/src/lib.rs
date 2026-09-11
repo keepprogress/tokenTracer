@@ -11,8 +11,8 @@ pub mod types;
 pub mod wsl;
 
 pub use discover::{
-    config_from_fixture_root, default_files_expand_limit, discover_fixtures, discover_paths,
-    list_files_for_source, resolve_path,
+    apply_host_env_defaults, config_from_fixture_root, default_files_expand_limit, discover_fixtures,
+    discover_paths, list_files_for_source, resolve_path,
 };
 pub use types::{
     canonical_root, make_source_id, make_source_id_from_canonical, wsl_canonical_root, AgentId,

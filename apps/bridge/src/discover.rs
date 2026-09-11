@@ -5,7 +5,7 @@
 //! Specs: AC v1.1a ∪ v1.2b. Live probe: docs/live-probe-NB-T3261.md.
 //! Contract: path-list-v0.2 — WSL ids embed `wsl:<Distro>:<posix>`.
 
-use crate::errors::{make_error, TT_F2_001, TT_F2_003, TT_F2_006};
+use crate::errors::{make_error, TT_F2_001, TT_F2_002, TT_F2_003, TT_F2_006};
 use crate::fsutil::probe_glob;
 use crate::types::{
     canonical_root, make_source_id, make_source_id_from_canonical, wsl_canonical_root, AgentId,
@@ -112,10 +112,17 @@ fn scan_wsl_distro(
     distro: &WslDistroProbe,
     config: &DiscoverConfig,
 ) {
-    let user = distro
-        .wsl_user
-        .clone()
-        .unwrap_or_else(|| "unknown".to_string());
+    let Some(user) = distro.wsl_user.clone() else {
+        errors.push(make_error(
+            TT_F2_002,
+            format!(
+                "WSL distro '{}': wsl_user unresolved — refusing to invent 'unknown' (path would be wrong)",
+                distro.name
+            ),
+            Some(distro.linux_home.display().to_string()),
+        ));
+        return;
+    };
     let home = &distro.linux_home;
 
     if !home.exists() {
@@ -512,6 +519,43 @@ pub fn list_files_for_source(
     }
 }
 
+/// Fill host path defaults from environment when CLI flags / config fields are omitted.
+///
+/// - **Windows** (`host_os == Windows`): `USERPROFILE` → `win_user_profile`, `APPDATA` (Roaming) → `win_appdata`
+/// - **macOS** (`host_os == Macos`): `HOME` → `macos_home`
+///
+/// No-op when values are already set. Safe to call on Linux with `host_os` set to Windows/Macos for tests.
+pub fn apply_host_env_defaults(cfg: &mut DiscoverConfig) {
+    match cfg.host_os {
+        HostOs::Windows => {
+            if cfg.win_user_profile.is_none() {
+                if let Some(p) = std::env::var_os("USERPROFILE") {
+                    if !p.is_empty() {
+                        cfg.win_user_profile = Some(PathBuf::from(p));
+                    }
+                }
+            }
+            if cfg.win_appdata.is_none() {
+                if let Some(p) = std::env::var_os("APPDATA") {
+                    if !p.is_empty() {
+                        cfg.win_appdata = Some(PathBuf::from(p));
+                    }
+                }
+            }
+        }
+        HostOs::Macos => {
+            if cfg.macos_home.is_none() {
+                if let Some(p) = std::env::var_os("HOME") {
+                    if !p.is_empty() {
+                        cfg.macos_home = Some(PathBuf::from(p));
+                    }
+                }
+            }
+        }
+        HostOs::Linux => {}
+    }
+}
+
 /// Load fixture layout for Linux-box POC / tests.
 pub fn config_from_fixture_root(fixture_root: &Path) -> DiscoverConfig {
     let distro_home = fixture_root.join("wsl_ubuntu").join("home").join("t3261");
@@ -559,4 +603,76 @@ pub fn resolve_path(p: PathBuf) -> PathBuf {
 /// Default limit for `files --source-id` when caller does not override.
 pub fn default_files_expand_limit() -> usize {
     FILES_EXPAND_DEFAULT_LIMIT
+}
+
+
+#[cfg(test)]
+mod env_defaults_tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    // Serialize env-mutating tests (process-global env).
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn windows_defaults_fill_from_userprofile_and_appdata() {
+        let _g = ENV_LOCK.lock().unwrap();
+        std::env::set_var("USERPROFILE", r"C:\Users\T3261");
+        std::env::set_var("APPDATA", r"C:\Users\T3261\AppData\Roaming");
+        let mut cfg = DiscoverConfig {
+            host_os: HostOs::Windows,
+            require_wsl_scan: false,
+            ..DiscoverConfig::default()
+        };
+        apply_host_env_defaults(&mut cfg);
+        assert_eq!(
+            cfg.win_user_profile.as_deref(),
+            Some(Path::new(r"C:\Users\T3261"))
+        );
+        assert_eq!(
+            cfg.win_appdata.as_deref(),
+            Some(Path::new(r"C:\Users\T3261\AppData\Roaming"))
+        );
+        // Explicit values win over env
+        cfg.win_user_profile = Some(PathBuf::from(r"D:\Other"));
+        apply_host_env_defaults(&mut cfg);
+        assert_eq!(cfg.win_user_profile.as_deref(), Some(Path::new(r"D:\Other")));
+        std::env::remove_var("USERPROFILE");
+        std::env::remove_var("APPDATA");
+    }
+
+    #[test]
+    fn macos_defaults_fill_from_home() {
+        let _g = ENV_LOCK.lock().unwrap();
+        std::env::set_var("HOME", "/Users/demo");
+        let mut cfg = DiscoverConfig {
+            host_os: HostOs::Macos,
+            require_wsl_scan: false,
+            ..DiscoverConfig::default()
+        };
+        apply_host_env_defaults(&mut cfg);
+        assert_eq!(cfg.macos_home.as_deref(), Some(Path::new("/Users/demo")));
+        std::env::remove_var("HOME");
+    }
+
+    #[test]
+    fn missing_wsl_user_emits_tt_f2_002_not_unknown() {
+        let mut sources = Vec::new();
+        let mut errors = Vec::new();
+        let distro = WslDistroProbe {
+            name: "Ubuntu-Work".into(),
+            state: "Running".into(),
+            version: Some("2".into()),
+            wsl_user: None,
+            linux_home: PathBuf::from(r"\\wsl$\Ubuntu-Work"),
+        };
+        let cfg = DiscoverConfig {
+            require_wsl_scan: false,
+            ..DiscoverConfig::default()
+        };
+        scan_wsl_distro(&mut sources, &mut errors, &distro, &cfg);
+        assert!(sources.is_empty());
+        assert!(errors.iter().any(|e| e.code == "TT-F2-002"));
+        assert!(!errors.iter().any(|e| e.message.contains("unknown") && !e.message.contains("invent")));
+    }
 }

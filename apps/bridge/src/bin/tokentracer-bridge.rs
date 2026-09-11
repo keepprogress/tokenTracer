@@ -1,8 +1,8 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use tokentracer_bridge::{
-    config_from_fixture_root, discover_paths, list_files_for_source, resolve_path, DiscoverConfig,
-    HostOs, FILES_EXPAND_DEFAULT_LIMIT,
+    apply_host_env_defaults, config_from_fixture_root, discover_paths, list_files_for_source,
+    resolve_path, DiscoverConfig, HostOs, FILES_EXPAND_DEFAULT_LIMIT,
 };
 
 #[derive(Parser, Debug)]
@@ -26,10 +26,13 @@ enum Commands {
         /// Use fixture roots under this directory (Linux POC / CI).
         #[arg(long)]
         fixture: Option<PathBuf>,
+        /// Windows user profile root. On Windows, defaults to %USERPROFILE% when omitted.
         #[arg(long)]
         win_user_profile: Option<PathBuf>,
+        /// Windows Roaming AppData. On Windows, defaults to %APPDATA% when omitted.
         #[arg(long)]
         win_appdata: Option<PathBuf>,
+        /// macOS home. On macOS, defaults to $HOME when omitted.
         #[arg(long)]
         macos_home: Option<PathBuf>,
     },
@@ -82,6 +85,8 @@ fn build_config(
     if let Some(p) = macos_home {
         cfg.macos_home = Some(resolve_path(p));
     }
+    // Live defaults: USERPROFILE/APPDATA on Windows; HOME on macOS (when flags omitted).
+    apply_host_env_defaults(&mut cfg);
     if cfg.host_os == HostOs::Linux
         && cfg.win_user_profile.is_none()
         && cfg.wsl_distros.is_empty()
