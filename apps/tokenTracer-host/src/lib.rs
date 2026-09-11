@@ -23,6 +23,7 @@ pub fn run() {
             commands::spend_by_model,
             commands::spend_by_pool,
             commands::import_status,
+            commands::spending_align,
             commands::discover,
             commands::import_run,
             commands::get_panel_mode,

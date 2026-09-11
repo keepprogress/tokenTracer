@@ -66,14 +66,14 @@ cargo tauri dev
 | `spend_by_model` | `currency`, `range?` | available; Expanded uses pool path |
 | `import_status` | — | last import |
 
-| `spending_align` | — | B-surface OPEN-BIND；CLI if present else EXAMPLE fixture |
+| `spending_align` | — | B-surface OPEN-BIND；live `spend spending-align --json` first, EXAMPLE fixture on failure |
 | `official_admin_reconcile` | — | optional F14 stub（≠ B pool %） |
 
 `dataSource()` → `"tauri"` | `"cli"` | `"fixture"`。Footer 反映目前路徑（A≠B payloads）。
 
 ## Env（bridge / host）
 
-同 `spend-dev-bridge.mjs`／宿主：`TOKENTRACER_LEDGER_ROOT`、`TOKENTRACER_SPEND_BIN`、`TOKENTRACER_EVENTS_*`、`TOKENTRACER_IMPORT_STATE`、`TOKENTRACER_FORCE_FIXTURES`。
+同 `spend-dev-bridge.mjs`／宿主：`TOKENTRACER_LEDGER_ROOT`、`TOKENTRACER_SPEND_BIN`、`TOKENTRACER_EVENTS_*`、`TOKENTRACER_IMPORT_STATE`、`TOKENTRACER_SPENDING_ALIGN*`、`TOKENTRACER_FORCE_FIXTURES`。
 
 Mapping: `src/bind/mapToMiniPanelVM.ts` (no sentinel `"Other"` model rows — usage_pool groups only).
 
@@ -150,15 +150,21 @@ Hard rules:
 | Enable undocumented by default / call it `official_admin` | F16 |
 | Invent Grok Bot week % endpoint / machine sync numbers | F18 |
 
-B-surface fixture: `src/mock/spending-align-manual-p1.json` (EXAMPLE · `manual_p1` · 65% / 100% · PARTIAL).
+### B surface: live vs fixture
 
-Until ledger ships `spend spending-align --json`, the Vite bridge serves that fixture (probe CLI; fallback — **does not fail build**).
+| Path | When |
+|------|------|
+| **Live** `spend spending-align --json [--state .token-tracer/spending-align.json]` | Default — Vite `/api/ipc/spending_align` and Tauri `spending_align` |
+| **Seed** `spend spending-align set --json <file>` | Write validated `manual_p1` into the state file (CLI only; not from A notional) |
+| **Fixture** `src/mock/spending-align-manual-p1.json` | CLI failure / missing bin / `TOKENTRACER_FORCE_FIXTURES=1` only (EXAMPLE · 65% / 100% · PARTIAL) |
+
+Never invent B `%` from notional / `by_usage_pool`. Empty state → live `source_mode=none` placeholder (OK).
 
 ## IPC additions (v1.4)
 
 | Command | Behavior |
 |---------|----------|
-| `spending_align` | Tauri invoke / `/api/ipc/spending_align` → CLI if present, else OPEN-BIND fixture |
+| `spending_align` | Tauri invoke / `/api/ipc/spending_align` → live CLI first, OPEN-BIND fixture on failure |
 | `official_admin_reconcile` | Optional F14 stub when `TOKENTRACER_ADMIN_EVENTS` + `TOKENTRACER_ADMIN_SPEND` set; else 404 (B mock still works) |
 
 ## Tray notes (host; not this webview)

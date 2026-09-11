@@ -8,7 +8,7 @@
  *
  * Spending align (B surface) is a **separate** payload from notional SpendSummary.
  * Local notional totals MUST NOT drive spending % (AC N25 / F17).
- * Until ledger ships `spend spending-align`, B surface uses OPEN-BIND fixture shape.
+ * Live path: `spend spending-align --json`; fixture only on failure / force.
  *
  * Command names match shell-host-contract-v0; UI never invents prices.
  */
@@ -212,7 +212,8 @@ export async function import_status(): Promise<ImportMeta> {
 
 /**
  * B-surface: OPEN-BIND SpendingAlign JSON.
- * Tries Tauri `spending_align` / `/api/ipc/spending_align`; else labeled fixture.
+ * Prefer Tauri / `/api/ipc/spending_align` → `spend spending-align --json`;
+ * fixture `spending-align-manual-p1.json` only on failure.
  * Never invent % from notional / by_usage_pool.
  */
 export async function spending_align(): Promise<SpendingAlign> {

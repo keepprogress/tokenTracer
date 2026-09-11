@@ -15,6 +15,8 @@ pub struct SpendPaths {
     pub pool: PathBuf,
     pub model: PathBuf,
     pub import_state: PathBuf,
+    /// OPEN-BIND SpendingAlign state (separate from ImportMeta).
+    pub spending_align_state: PathBuf,
 }
 
 impl SpendPaths {
@@ -40,6 +42,11 @@ impl SpendPaths {
                 &root,
                 "TOKENTRACER_IMPORT_STATE",
                 ".token-tracer/import-meta.json",
+            ),
+            spending_align_state: env_or(
+                &root,
+                "TOKENTRACER_SPENDING_ALIGN_STATE",
+                ".token-tracer/spending-align.json",
             ),
             root,
         }
@@ -253,5 +260,20 @@ pub fn import_status() -> Result<Value> {
         "--json",
         "--state",
         paths.import_state.to_str().unwrap_or_default(),
+    ])
+}
+
+/// `spend spending-align --json [--state .token-tracer/spending-align.json]`
+/// Comparison layer only — never invents pct from notional / by_usage_pool.
+pub fn spending_align() -> Result<Value> {
+    let paths = SpendPaths::resolve();
+    run_spend(&[
+        "spending-align",
+        "--json",
+        "--state",
+        paths
+            .spending_align_state
+            .to_str()
+            .unwrap_or(".token-tracer/spending-align.json"),
     ])
 }
