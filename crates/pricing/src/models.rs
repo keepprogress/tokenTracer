@@ -356,3 +356,137 @@ impl ImportMeta {
         }
     }
 }
+
+
+// ---------------------------------------------------------------------------
+// AC v1.4 — Cursor official / Spending align (ledger)
+// ---------------------------------------------------------------------------
+
+/// Cursor usage source mode (AC v1.4 §3). Wire names align with bridge `SourceMode`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CursorSourceMode {
+    OfficialAdmin,
+    LocalEnrichment,
+    UndocumentedDashboard,
+}
+
+impl CursorSourceMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CursorSourceMode::OfficialAdmin => "official_admin",
+            CursorSourceMode::LocalEnrichment => "local_enrichment",
+            CursorSourceMode::UndocumentedDashboard => "undocumented_dashboard",
+        }
+    }
+}
+
+impl std::fmt::Display for CursorSourceMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Pricing / Cursor official config knobs (AC-F16).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CursorOfficialConfig {
+    /// Undocumented dashboard RPC/CSV paths (U1/U2). **Default false.**
+    #[serde(default)]
+    pub undocumented_dashboard: bool,
+}
+
+impl Default for CursorOfficialConfig {
+    fn default() -> Self {
+        Self {
+            undocumented_dashboard: false,
+        }
+    }
+}
+
+impl CursorOfficialConfig {
+    pub fn is_undocumented_dashboard_enabled(&self) -> bool {
+        self.undocumented_dashboard
+    }
+}
+
+/// One member row from Admin `/teams/spend` (S2).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TeamMemberSpend {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
+    /// On-demand spend cents for the member (docs: `spendCents`).
+    pub spend_cents: f64,
+    /// Included + on-demand when present (docs: `overallSpendCents`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub overall_spend_cents: Option<f64>,
+}
+
+/// Normalized Admin spend snapshot (S2) — not a UsageEvent.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SpendSnapshot {
+    pub members: Vec<TeamMemberSpend>,
+    /// Authoritative cycle overall cents used for reconcile (top-level or Σ members).
+    pub overall_spend_cents: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subscription_cycle_start: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total_members: Option<u64>,
+}
+
+/// Σ `chargedCents` ↔ `/teams/spend` reconcile (AC-F14). Abs tol default $0.01.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReconcileReport {
+    pub events_charged_cents_sum: f64,
+    pub events_charged_usd: f64,
+    pub spend_overall_cents: f64,
+    pub spend_overall_usd: f64,
+    pub delta_usd: f64,
+    pub tolerance_usd: f64,
+    pub matched: bool,
+    pub event_count: usize,
+    pub spend_member_count: usize,
+}
+
+pub const RECONCILE_TOLERANCE_USD: f64 = 0.01;
+
+/// Personal Ultra / Spending UI align target (AC-F17). **Comparison layer — not UsageEvent.**
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SpendingAlignSummary {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cursor_models_percent: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub other_models_percent: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reset_note: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on_demand: Option<OnDemandAlign>,
+    /// Always true for personal path without official_admin.
+    pub partial: bool,
+    /// No public personal usage API (OPEN-C1 / bridge message).
+    pub no_public_personal_usage_api: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OnDemandAlign {
+    pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub monthly_limit_note: Option<String>,
+}
+
+/// Env var for Team Admin API key — **same as bridge** `ENV_ADMIN_API_KEY`.
+pub const CURSOR_ADMIN_API_KEY_ENV: &str = "TOKENTRACER_CURSOR_ADMIN_API_KEY";
+
+pub const CURSOR_LOCAL_ONLY_DISCLAIMER: &str =
+    "PARTIAL (local_enrichment): Cursor local / bubble data is not a sole authoritative invoice USD or Spending pool %. Prefer Team Admin official_admin (filtered-usage-events + /teams/spend) or human Spending UI align. Not a subscription invoice.";
+
+pub const UNDOCUMENTED_DASHBOARD_BANNER: &str =
+    "UNSUPPORTED / undocumented / fragile: undocumented_dashboard opt-in. Not official_admin.";
+
+/// Bridge contract personal message (AC-F17) — comparison layer consumers.
+pub const PERSONAL_NO_PUBLIC_USAGE_API_MSG: &str = "無公開個人 usage API";
