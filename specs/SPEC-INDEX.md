@@ -21,6 +21,7 @@
 | [AC-v1.3a.md](./AC-v1.3a.md) | **已核准** | Other Models＝`usage_pool` |
 | [AC-v1.3b.md](./AC-v1.3b.md) | **待核准** | F3：訂正 +347 誤讀；`/mnt/c` 資料面可對齊；Win-native＝進程契約；OPEN-F3-DEDUP |
 | [AC-v1.4-cursor-official.md](./AC-v1.4-cursor-official.md) | **已核准** | official_admin／Ultra PARTIAL；OPEN-C1…C5＋**C7** 已填；C6／C8／C9 HOLD |
+| [AC-F10-HOLD-LIFTED-2026-09-11.md](./AC-F10-HOLD-LIFTED-2026-09-11.md) | **排程註記** | F10 優先 HOLD 解除；閘門＝v1.2／v1.2b；**不改**已核條款 |
 
 ## 仍 OPEN（節選）
 
@@ -31,6 +32,7 @@
 | OPEN-P3…P5 | 見 AC v1.3（價表維護等） |
 | AC-v1.4-cursor-official | **已核准** — 實作交接帳本／儀表／橋樑 |
 | AC-v1.3b | **待核准** — F3 去重註記修訂稿 |
+| **AC-F10** | **優先 HOLD 已解除**（2026-09-11）— 閘門＝已核 v1.2／v1.2b；見 [AC-F10-HOLD-LIFTED-2026-09-11.md](./AC-F10-HOLD-LIFTED-2026-09-11.md) |
 
 ## 證據
 
