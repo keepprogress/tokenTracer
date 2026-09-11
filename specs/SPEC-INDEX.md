@@ -20,7 +20,7 @@
 | [AC-v1.3.md](./AC-v1.3.md) | **已核准** | by_model、官方 API notional |
 | [AC-v1.3a.md](./AC-v1.3a.md) | **已核准** | Other Models＝`usage_pool` |
 | [AC-v1.3b.md](./AC-v1.3b.md) | **待核准** | F3：訂正 +347 誤讀；`/mnt/c` 資料面可對齊；Win-native＝進程契約；OPEN-F3-DEDUP |
-| [AC-v1.4-cursor-official.md](./AC-v1.4-cursor-official.md) | **已核准** | official_admin／Ultra PARTIAL／undocumented 預設關；OPEN-C1…C5 已填 |
+| [AC-v1.4-cursor-official.md](./AC-v1.4-cursor-official.md) | **已核准** | official_admin／Ultra PARTIAL；OPEN-C1…C5＋**C7** 已填；C6／C8／C9 HOLD |
 
 ## 仍 OPEN（節選）
 
