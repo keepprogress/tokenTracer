@@ -139,6 +139,7 @@ pub fn import_from_discover_result(
                         Ok(events) => {
                             for mut ev in events {
                                 attach_host_os(&mut ev, &src.host);
+                                scope_event_id(&src.id, &mut ev);
                                 if !by_id.contains_key(&ev.id) {
                                     order.push(ev.id.clone());
                                     by_id.insert(ev.id.clone(), ev);
@@ -290,6 +291,32 @@ fn attach_host_os(ev: &mut UsageEvent, host: &str) {
     ev.meta = Some(meta);
 }
 
+/// Scope a vendor UsageEvent.id by discover source id so Win/WSL (and other
+/// hosts) with the same Claude `message.id` / Codex `response_id` do not
+/// collide in the global by_id upsert.
+///
+/// Stores the original id in `meta.vendor_event_id`, then sets
+/// `ev.id = src_id + "::" + original`. Idempotent when already prefixed.
+pub fn scope_event_id(src_id: &str, ev: &mut UsageEvent) {
+    let prefix = format!("{src_id}::");
+    if ev.id.starts_with(&prefix) {
+        return;
+    }
+    let original = ev.id.clone();
+    let mut meta = ev
+        .meta
+        .take()
+        .unwrap_or_else(|| serde_json::json!({}));
+    if let Some(obj) = meta.as_object_mut() {
+        obj.insert(
+            "vendor_event_id".into(),
+            serde_json::Value::String(original.clone()),
+        );
+    }
+    ev.meta = Some(meta);
+    ev.id = format!("{prefix}{original}");
+}
+
 /// Helper used by tests: build a minimal DiscoverSource.
 pub fn test_source(
     id: &str,
@@ -325,4 +352,89 @@ pub fn dedup_events_by_id(events: Vec<UsageEvent>) -> Vec<UsageEvent> {
         }
     }
     out
+}
+
+
+#[cfg(test)]
+mod scope_event_id_tests {
+    use super::*;
+    use crate::models::AgentId;
+
+    fn sample_event(id: &str) -> UsageEvent {
+        UsageEvent {
+            id: id.into(),
+            agent: AgentId::ClaudeCode,
+            source: "test".into(),
+            ts: "2026-09-11T00:00:00Z".into(),
+            model: Some("claude-sonnet-4-20250514".into()),
+            usage_pool: None,
+            input_tokens: 1,
+            output_tokens: 1,
+            cache_read_tokens: None,
+            cache_write_tokens: None,
+            raw_cost_usd: None,
+            meta: Some(serde_json::json!({})),
+        }
+    }
+
+    #[test]
+    fn scopes_id_and_preserves_vendor_event_id() {
+        let mut ev = sample_event("msg_shared");
+        scope_event_id("EC-claude-code-v1:windows:/win", &mut ev);
+        assert_eq!(ev.id, "EC-claude-code-v1:windows:/win::msg_shared");
+        assert_eq!(
+            ev.meta
+                .as_ref()
+                .and_then(|m| m.get("vendor_event_id"))
+                .and_then(|v| v.as_str()),
+            Some("msg_shared")
+        );
+    }
+
+    #[test]
+    fn skip_if_already_prefixed() {
+        let mut ev = sample_event("EC-x:windows:/a::msg_shared");
+        scope_event_id("EC-x:windows:/a", &mut ev);
+        assert_eq!(ev.id, "EC-x:windows:/a::msg_shared");
+        // Did not rewrite vendor_event_id when already scoped
+        assert!(ev
+            .meta
+            .as_ref()
+            .and_then(|m| m.get("vendor_event_id"))
+            .is_none());
+    }
+
+    #[test]
+    fn same_vendor_id_different_sources_both_survive_dedup() {
+        let src_win = "EC-claude-code-v1:windows:/Users/me/.claude";
+        let src_wsl = "EC-claude-code-v1:wsl2:wsl:Ubuntu:/home/me/.claude";
+        let mut win = sample_event("msg_same");
+        let mut wsl = sample_event("msg_same");
+        scope_event_id(src_win, &mut win);
+        scope_event_id(src_wsl, &mut wsl);
+        let kept = dedup_events_by_id(vec![win, wsl]);
+        assert_eq!(kept.len(), 2, "cross-host same vendor id must not collide");
+        assert_ne!(kept[0].id, kept[1].id);
+        assert_eq!(
+            kept[0]
+                .meta
+                .as_ref()
+                .and_then(|m| m.get("vendor_event_id"))
+                .and_then(|v| v.as_str()),
+            Some("msg_same")
+        );
+        assert_eq!(
+            kept[1]
+                .meta
+                .as_ref()
+                .and_then(|m| m.get("vendor_event_id"))
+                .and_then(|v| v.as_str()),
+            Some("msg_same")
+        );
+        let expect_win = format!("{src_win}::msg_same");
+        let expect_wsl = format!("{src_wsl}::msg_same");
+        let ids: std::collections::HashSet<_> = kept.iter().map(|e| e.id.clone()).collect();
+        assert!(ids.contains(&expect_win));
+        assert!(ids.contains(&expect_wsl));
+    }
 }
