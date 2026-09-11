@@ -1,7 +1,7 @@
 //! Filesystem helpers for discovery (read-only).
 
-use crate::errors::{make_error, TT_F2_003, TT_F2_004, TT_F2_005};
-use crate::types::{DiscoverError, SourceStatus};
+use crate::errors::{make_error, permission_denied_code, TT_F2_003, TT_F2_005};
+use crate::types::{DiscoverError, SourceHost, SourceStatus};
 use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
@@ -18,14 +18,15 @@ pub struct GlobMatch {
 }
 
 /// Match files under `root` whose relative path matches a simple glob.
-/// Supported patterns used by evidence cards:
-/// - `**/*.jsonl`
-/// - `**/rollout-*.jsonl`
-/// - `state.vscdb` / `**/state.vscdb`
 ///
-/// `cap == 0` means unlimited (return all matches). `cap > 0` caps `files` length
-/// and sets `truncated` when more matches exist.
+/// Defaults host to Windows for callers that do not thread a host (Win/WSL
+/// PermissionDenied stays TT-F2-004). Prefer [`probe_glob_for_host`] from discover.
 pub fn probe_glob(root: &Path, glob: &str, cap: usize) -> GlobMatch {
+    probe_glob_for_host(root, glob, cap, SourceHost::Windows)
+}
+
+/// Like [`probe_glob`], but maps PermissionDenied to TT-F10-FDA on macOS hosts.
+pub fn probe_glob_for_host(root: &Path, glob: &str, cap: usize, host: SourceHost) -> GlobMatch {
     if !root.exists() {
         return GlobMatch {
             files: Vec::new(),
@@ -43,7 +44,7 @@ pub fn probe_glob(root: &Path, glob: &str, cap: usize) -> GlobMatch {
 
     if let Err(e) = fs::metadata(root) {
         let code = if e.kind() == std::io::ErrorKind::PermissionDenied {
-            TT_F2_004
+            permission_denied_code(host)
         } else {
             TT_F2_005
         };
@@ -80,7 +81,7 @@ pub fn probe_glob(root: &Path, glob: &str, cap: usize) -> GlobMatch {
                         .unwrap_or_else(|| root.display().to_string());
                     let io_kind = err.io_error().map(|e| e.kind());
                     let code = if io_kind == Some(std::io::ErrorKind::PermissionDenied) {
-                        TT_F2_004
+                        permission_denied_code(host)
                     } else {
                         TT_F2_005
                     };
@@ -165,7 +166,6 @@ fn match_components(path: &[&str], pat: &[&str]) -> bool {
             if gi + 1 == pat.len() {
                 return true;
             }
-            // Try to match the remainder starting at each path position.
             for start in pi..=path.len() {
                 if match_components(&path[start..], &pat[gi + 1..]) {
                     return true;
@@ -267,6 +267,53 @@ mod tests {
         assert_eq!(capped.files.len(), 1);
         assert!(capped.truncated);
 
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn missing_path_is_error_not_panic() {
+        let root = std::env::temp_dir().join("tt-bridge-missing-path-nope");
+        let _ = fs::remove_dir_all(&root);
+        let m = probe_glob_for_host(&root, "**/*.jsonl", 0, SourceHost::Macos);
+        assert_eq!(m.status, SourceStatus::Error);
+        assert!(!m.readable);
+        assert_eq!(m.file_count, 0);
+        let err = m.error.expect("diagnostic");
+        assert_eq!(err.code, "TT-F2-003");
+        assert!(!err.next_step.is_empty());
+    }
+
+    #[test]
+    fn permission_denied_on_macos_maps_to_tt_f10_fda() {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("tt-bridge-fda-{nanos}"));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&root).unwrap().permissions();
+            perms.set_mode(0o000);
+            fs::set_permissions(&root, perms).unwrap();
+        }
+        let mac = probe_glob_for_host(&root, "**/*.jsonl", 0, SourceHost::Macos);
+        let win = probe_glob_for_host(&root, "**/*.jsonl", 0, SourceHost::Windows);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&root).unwrap().permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&root, perms).unwrap();
+        }
+        let mac_err = mac.error.expect("macos diagnostic");
+        assert_eq!(mac_err.code, "TT-F10-FDA", "{mac_err:?}");
+        assert!(mac_err.next_step.contains("Full Disk Access"));
+        assert!(mac_err.next_step.to_ascii_lowercase().contains("not required"));
+        let win_err = win.error.expect("win diagnostic");
+        assert_eq!(win_err.code, "TT-F2-004", "{win_err:?}");
         let _ = fs::remove_dir_all(&root);
     }
 }

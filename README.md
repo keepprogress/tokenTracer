@@ -6,7 +6,7 @@ Open-source **token usage & notional USD spend** tracker for coding agents on **
 
 ## Status
 
-Early scaffold (AC v1.1–v1.3a + **v1.2／v1.2b macOS**). Pricing CLI + discovery bridge + mini-panel UI + **Tauri 2 host** (Win tray + **macOS menu bar**).
+Early scaffold (AC v1.1–v1.3a + **v1.2／v1.2b macOS** + **F10 packaging**). Pricing CLI + discovery bridge + mini-panel UI + **Tauri 2 host** (Win tray + **macOS menu bar** shell). Live Mac smoke: **BLOCKED** until Apple Silicon host.
 
 ## Layout
 
@@ -81,7 +81,15 @@ cargo tauri dev
 cargo tauri build   # → bundle/dmg/*.dmg
 ```
 
-Linux agent box: `cargo check -p tokentracer-host` only as far as system libs allow — **no fake tray / menu-bar PASS screenshots**.
+Linux agent box: `cargo check -p tokentracer-host` only as far as system libs allow — **no fake tray / menu-bar PASS screenshots**. **Linux cannot produce a real `.dmg`.**
+
+### macOS packaging / FDA (bridge · AC-F10)
+
+- Install: **`.dmg` 拖曳至 Applications**（`tauri.conf.json` targets include `dmg`; min macOS **13.0**）.
+- Arch: **Apple Silicon 必過**; Intel best-effort (`x86_64-apple-darwin` / Rosetta; does not block PASS).
+- Paths: Cursor `Application Support` **and** `~/.cursor/`; Claude `~/.claude/projects`; Codex `~/.codex/sessions`.
+- FDA: **非預設必要**. PermissionDenied → diagnostic **`TT-F10-FDA`** with System Settings steps; never silent 0 data.
+- Menu-bar UI = **儀表** (`AC-F7′`); bridge does not self-PASS live Mac smoke (see `evidence/pr18-macos-f10-20260911/`).
 
 ## License
 

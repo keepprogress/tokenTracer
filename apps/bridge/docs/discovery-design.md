@@ -69,7 +69,7 @@ WSL `canonical_root` = `wsl:<Distro>:<posix-abs>` (path-list-v0.2); `meta.import
 
 - **claude_code:** Win `%USERPROFILE%\.claude\projects/**/*.jsonl` **and** WSL `~/.claude/projects/**/*.jsonl`
 - **codex:** Win `%USERPROFILE%\.codex\sessions/**/rollout-*.jsonl` (+ archived) **and** WSL same under `~/.codex`
-- **cursor:** Win `%APPDATA%\Cursor\User\globalStorage\state.vscdb` (+ optional workspaceStorage); note `~/.cursor` trees; macOS `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`
+- **cursor:** Win `%APPDATA%\Cursor\User\globalStorage\state.vscdb` (+ optional workspaceStorage); note `~/.cursor` trees; macOS `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` **and** `~/.cursor/` (enrichment; not L1 billing)
 - **NEVER** treat bubble `tokenCount` as billed usage — Cursor stays `status: partial`
 
 ---
@@ -110,8 +110,10 @@ See **CONTRACT-path-list-v0.md**.
 | TT-F2-004 | Permission denied | Grant read; fix `\\wsl$\` ACL or use `wsl -d` probes |
 | TT-F2-005 | Path unreadable | Check locks/corruption; open SQLite read-only; retry |
 | TT-F2-006 | File list truncated | Raise `--limit` or `--limit 0`; do not treat list as complete |
+| TT-F10-FDA | macOS permission denied (FDA troubleshooting) | System Settings → Privacy & Security → Full Disk Access → enable tokenTracer; FDA troubleshooting only, not required for normal install; re-run discover |
+| TT-F10-001 | macOS permission denied (numeric twin) | Same next_step as TT-F10-FDA |
 
-Each `DiscoverError` includes human `next_step`.
+Each `DiscoverError` includes human `next_step`. macOS PermissionDenied maps to **TT-F10-***; Win/WSL keep **TT-F2-004**. See [`macos-f10-packaging-v0.md`](./macos-f10-packaging-v0.md).
 
 ---
 
