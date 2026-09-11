@@ -41,6 +41,25 @@ Live Admin fetch (optional; not required for tests) uses env
 Pricing/bridge do **not** invent secret storage. Missing key → clear error
 (`TT-C14-MISSING-KEY` semantics); fixture reconcile needs no key.
 
+## SpendingAlign (OPEN-BIND / AC-F17 comparison layer)
+
+`spending-align-manual-p1.json` is a personal Ultra align target (65% / 100%, `manual_p1`, PARTIAL「無公開個人 usage API」). Matches the UI mock numbers — **not** live Spending, **not** notional `by_usage_pool` %.
+
+```bash
+# missing state → source_mode=none placeholder (pcts null)
+cargo run -p pricing --bin spend -- spending-align --json \
+  --state /tmp/tt-spending-align-missing.json
+
+# write manual_p1, then read (default state: .token-tracer/spending-align.json)
+cargo run -p pricing --bin spend -- spending-align set \
+  --json fixtures/ac-v1.4/spending-align-manual-p1.json \
+  --state /tmp/tt-spending-align.json
+cargo run -p pricing --bin spend -- spending-align --json \
+  --state /tmp/tt-spending-align.json
+```
+
+Hard rules: do not compute pct from `SpendSummary.total` / `by_usage_pool.amount`; do not copy Admin reconcile cents into pct; `local_enrichment` is not a `source_mode`. Admin key (`TOKENTRACER_CURSOR_ADMIN_API_KEY`) is a separate credential contract.
+
 ## Verify (fixture-only)
 
 ```bash
@@ -49,4 +68,5 @@ cargo run -p pricing --bin spend -- cursor official-reconcile \
   --spend fixtures/ac-v1.4/admin-spend.json
 
 cargo test -p pricing --test ac_v1_4_cursor_official
+cargo test -p pricing --test ac_v1_4_spending_align
 ```

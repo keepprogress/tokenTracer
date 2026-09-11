@@ -129,7 +129,8 @@ impl std::fmt::Display for UsagePool {
 pub const CURSOR_UNKNOWN_MODEL: &str = "cursor:unknown";
 
 /// Forbidden literal model strings (must never be treated as model or pool authority).
-pub const FORBIDDEN_OTHER_MODEL_LITERALS: &[&str] = &["Other", "Other model", "other", "other model"];
+pub const FORBIDDEN_OTHER_MODEL_LITERALS: &[&str] =
+    &["Other", "Other model", "other", "other model"];
 
 /// Per-(agent, model) spend row (AC v1.3 ∪ v1.3a / BY-MODEL v0.2).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -357,7 +358,6 @@ impl ImportMeta {
     }
 }
 
-
 // ---------------------------------------------------------------------------
 // AC v1.4 — Cursor official / Spending align (ledger)
 // ---------------------------------------------------------------------------
@@ -454,6 +454,9 @@ pub struct ReconcileReport {
 pub const RECONCILE_TOLERANCE_USD: f64 = 0.01;
 
 /// Personal Ultra / Spending UI align target (AC-F17). **Comparison layer — not UsageEvent.**
+///
+/// Legacy sketch field names (`*_percent`, `reset_note`, structured `on_demand`).
+/// OPEN-BIND / CLI / UI wire type is [`SpendingAlign`] (`cursor_models_pct`, …).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SpendingAlignSummary {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -470,6 +473,90 @@ pub struct SpendingAlignSummary {
     pub no_public_personal_usage_api: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
+}
+
+/// OPEN-BIND spending-align v0 wire `source_mode`.
+///
+/// **Not** [`CursorSourceMode`]: `local_enrichment` must never appear here
+/// (L1 only affects A-surface PARTIAL / F15). Spec `undocumented_dashboard`
+/// maps to [`SpendingAlignSourceMode::UndocumentedOptIn`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SpendingAlignSourceMode {
+    None,
+    ManualP1,
+    OfficialAdmin,
+    UndocumentedOptIn,
+}
+
+impl SpendingAlignSourceMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::ManualP1 => "manual_p1",
+            Self::OfficialAdmin => "official_admin",
+            Self::UndocumentedOptIn => "undocumented_opt_in",
+        }
+    }
+}
+
+impl std::fmt::Display for SpendingAlignSourceMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+pub const SPENDING_ALIGN_SCHEMA_VERSION: &str = "spending-align/v0";
+
+/// Default ledger-side state file (OPEN-BIND-S2). Separate from ImportMeta.
+pub const DEFAULT_SPENDING_ALIGN_STATE: &str = ".token-tracer/spending-align.json";
+
+/// OPEN-BIND SpendingAlign wire payload (AC-F17 comparison layer).
+///
+/// Never derived from notional `SpendSummary.total` or `by_usage_pool.amount`.
+/// Official Admin reconcile cents must not be written into `*_pct` fields.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SpendingAlign {
+    pub schema_version: String,
+    /// 0–100; personal path may leave null. Aliases accept the F17 sketch name.
+    #[serde(default, alias = "cursor_models_percent")]
+    pub cursor_models_pct: Option<f64>,
+    #[serde(default, alias = "other_models_percent")]
+    pub other_models_pct: Option<f64>,
+    #[serde(default, alias = "reset_note")]
+    pub reset_label: Option<String>,
+    /// Display string (e.g. `"Disabled"`), not structured cents.
+    #[serde(default)]
+    pub on_demand: Option<String>,
+    pub source_mode: SpendingAlignSourceMode,
+    pub partial: bool,
+    #[serde(default)]
+    pub partial_reason: Option<String>,
+    #[serde(default)]
+    pub grok_bot_week_note: Option<String>,
+    /// ISO-8601 UTC. Stamped on `set`; placeholder uses read-time stamp.
+    #[serde(default)]
+    pub computed_at: String,
+}
+
+impl SpendingAlign {
+    pub fn none_placeholder(computed_at: impl Into<String>) -> Self {
+        Self {
+            schema_version: SPENDING_ALIGN_SCHEMA_VERSION.to_string(),
+            cursor_models_pct: None,
+            other_models_pct: None,
+            reset_label: None,
+            on_demand: None,
+            source_mode: SpendingAlignSourceMode::None,
+            partial: true,
+            partial_reason: Some(format!(
+                "PARTIAL：尚無 SpendingAlign 對照資料（state 檔不存在）。{}；％不得由本機 notional／by_usage_pool 推算。",
+                PERSONAL_NO_PUBLIC_USAGE_API_MSG
+            )),
+            grok_bot_week_note: None,
+            computed_at: computed_at.into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

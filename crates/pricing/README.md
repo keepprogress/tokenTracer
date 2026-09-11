@@ -129,3 +129,15 @@ cargo run -p pricing --bin spend -- by-pool --currency USD \
 - `usage_pool` = `cursor_models` | `other_models` | `unknown` (orthogonal to model id).
 - `pricing_mode=notional_api_estimate` + `disclaimer` on every SpendSummary.
 - Cursor `tier` map is **PARTIAL** (1→other_models, 2→cursor_models) per EC-cursor-other-models-v1.
+
+## AC v1.4 — SpendingAlign CLI (OPEN-BIND)
+
+Comparison layer only (not UsageEvent / not notional). Default state `.token-tracer/spending-align.json`.
+
+```bash
+cargo run -p pricing --bin spend -- spending-align --json
+cargo run -p pricing --bin spend -- spending-align set \
+  --json ../../fixtures/ac-v1.4/spending-align-manual-p1.json
+```
+
+Missing state → `source_mode=none` placeholder. `set` validates `manual_p1` and stamps `computed_at`. Never derive pct from `by_usage_pool.amount` or Admin cents. See `design/ledger/open-bind-spending-align-v0.md`.

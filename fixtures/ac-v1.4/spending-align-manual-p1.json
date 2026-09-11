@@ -1,0 +1,12 @@
+{
+  "schema_version": "spending-align/v0",
+  "cursor_models_pct": 65,
+  "other_models_pct": 100,
+  "reset_label": "≈ 9/12",
+  "on_demand": "Disabled",
+  "source_mode": "manual_p1",
+  "partial": true,
+  "partial_reason": "PARTIAL：無公開個人 usage API；兩池％為 Spending 對齊目標（手動／截圖），非本機 token 加總",
+  "grok_bot_week_note": "Spending 有 Grok Bot 週列；機器同步＝HOLD",
+  "computed_at": "2026-09-11T09:00:00Z"
+}
