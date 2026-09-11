@@ -1,0 +1,52 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pricing-and-e2e:
+    name: pricing + fixture e2e (linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target"
+
+      - name: cargo test -p pricing
+        run: cargo test -p pricing
+
+      - name: cargo test -p tokentracer-bridge
+        run: cargo test -p tokentracer-bridge
+
+      - name: fixture e2e discover→import
+        run: |
+          chmod +x scripts/e2e-discover-import.sh
+          ./scripts/e2e-discover-import.sh
+
+  ui-build:
+    name: ui build (linux)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: apps/ui/package-lock.json
+      - run: npm ci
+      - run: npm run build

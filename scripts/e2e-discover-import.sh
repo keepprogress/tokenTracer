@@ -8,24 +8,26 @@ set -euo pipefail
 die() { echo "ERROR: $*" >&2; exit 1; }
 log() { echo "$*" >&2; }
 
-# Prefer sibling bridge checkout; fall back to monorepo apps/bridge.
+# Prefer monorepo rooted next to this script; then legacy local checkouts.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [[ -z "${BRIDGE_ROOT:-}" ]]; then
-  if [[ -f /workspace/tokenTracer-bridge/Cargo.toml ]]; then
+  if [[ -f "$ROOT/apps/bridge/Cargo.toml" ]]; then
+    BRIDGE_ROOT="$ROOT/apps/bridge"
+  elif [[ -f /workspace/tokenTracer-bridge/Cargo.toml ]]; then
     BRIDGE_ROOT=/workspace/tokenTracer-bridge
   elif [[ -f /workspace/tokenTracer/apps/bridge/Cargo.toml ]]; then
     BRIDGE_ROOT=/workspace/tokenTracer/apps/bridge
+  elif [[ -f "$ROOT/src/bin/tokentracer-bridge.rs" ]]; then
+    BRIDGE_ROOT="$ROOT"
   else
-    HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-    if [[ -f "$HERE/src/bin/tokentracer-bridge.rs" ]]; then
-      BRIDGE_ROOT="$HERE"
-    else
-      die "bridge not found; set BRIDGE_ROOT"
-    fi
+    die "bridge not found; set BRIDGE_ROOT"
   fi
 fi
 
 if [[ -z "${PRICING_ROOT:-}" ]]; then
-  if [[ -f /home/box/agent-data/projects/token-spend-tracker/crates/pricing/Cargo.toml ]]; then
+  if [[ -f "$ROOT/crates/pricing/Cargo.toml" ]]; then
+    PRICING_ROOT="$ROOT"
+  elif [[ -f /home/box/agent-data/projects/token-spend-tracker/crates/pricing/Cargo.toml ]]; then
     PRICING_ROOT=/home/box/agent-data/projects/token-spend-tracker
   elif [[ -f /workspace/tokenTracer/crates/pricing/Cargo.toml ]]; then
     PRICING_ROOT=/workspace/tokenTracer
