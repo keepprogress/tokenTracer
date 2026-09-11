@@ -1,10 +1,8 @@
 /**
  * Mock IPC surface — same command names as shell-host-contract-v0.
- * Spend totals come from real ledger CLI JSON (refresh-from-ledger.sh).
+ * Spend totals / series come from real ledger CLI JSON (refresh-from-ledger.sh):
+ * `spend by-pool|series --range <kind>` on fixtures/ac-v1.3a/cursor-pools-ranged.json.
  * Real host will swap these for Tauri `invoke`.
- *
- * Range filtering awaits CLI `--range`; until then every range.kind returns
- * the same real by-pool SpendSummary with only `range.kind` retagged.
  * No invented / scaled prices.
  */
 import type { Currency, DailySpendSeries, ImportMeta, PanelRangeKind, RangeKind, SpendSummary } from "./types";
@@ -22,7 +20,7 @@ import series30d from "./mock/spend-series-30d.json";
 import series90d from "./mock/spend-series-90d.json";
 import importStatusFixture from "./mock/import-status.json";
 
-/** Real ledger by-pool summary (cursor-pools fixture) retagged per range.kind. */
+/** Per-range SpendSummary from real `spend by-pool --range <kind>`. */
 const TOTALS: Record<RangeKind, SpendSummary> = {
   today: spendToday as SpendSummary,
   all: spendAll as SpendSummary,
@@ -31,6 +29,7 @@ const TOTALS: Record<RangeKind, SpendSummary> = {
   "90d": spend90d as SpendSummary,
 };
 
+/** Per-range series from real `spend series --grain day --range <kind>`. */
 const SERIES: Record<PanelRangeKind, DailySpendSeries> = {
   all: seriesAll as DailySpendSeries,
   "7d": series7d as DailySpendSeries,
@@ -53,7 +52,7 @@ function cloneSummary(base: SpendSummary, currency: Currency): SpendSummary {
   };
 }
 
-/** Aligns CLI: `spend total --range … --currency …` (fixtures from ledger CLI). */
+/** Aligns CLI: `spend by-pool --range … --currency …` (fixtures from ledger CLI). */
 export async function spend_total(
   range: RangeKind,
   currency: Currency = "USD",
@@ -75,14 +74,14 @@ export async function spend_by_model(currency: Currency = "USD"): Promise<SpendS
 
 /**
  * Real ledger `spend by-pool` JSON (fixtures/ac-v1.3a/cursor-pools.json).
- * Primary all-summary / dual-pool fixture used by spend_total ranges.
+ * Dual-pool fixture (all / non-ranged).
  */
 export async function spend_by_pool(currency: Currency = "USD"): Promise<SpendSummary> {
   await delay();
   return cloneSummary(ledgerByPool as SpendSummary, currency);
 }
 
-/** Aligns CLI: `spend series --grain day --range …` (still mock series until CLI series lands). */
+/** Aligns CLI: `spend series --grain day --range …` (fixtures from ledger CLI). */
 export async function spend_series(
   grain: "day",
   range: PanelRangeKind,
