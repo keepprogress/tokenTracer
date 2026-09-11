@@ -1,5 +1,12 @@
 import "./style.css";
-import { spend_total, spend_series, import_status, dataSource, isTauriHost } from "./api";
+import {
+  spend_total,
+  spend_by_pool,
+  spend_series,
+  import_status,
+  dataSource,
+  isTauriHost,
+} from "./api";
 import { mapToMiniPanelVM } from "./bind/mapToMiniPanelVM";
 import type { MiniPanelVM, PanelRangeKind, SpendSummary } from "./types";
 import { DEFAULT_DISCLAIMER } from "./types";
@@ -64,9 +71,11 @@ async function loadAll(nextRange: PanelRangeKind = range): Promise<void> {
   range = nextRange;
   render();
   try {
+    // today via spend_total; Expanded range via spend_by_pool so by_usage_pool /
+    // by_model land for AC-F7.2 (same CLI as Vite bridge — no invented prices).
     const [today, rangeSummary, series, meta] = await Promise.all([
       spend_total("today", "USD"),
-      spend_total(nextRange, "USD"),
+      spend_by_pool("USD", nextRange),
       spend_series("day", nextRange, "USD"),
       import_status(),
     ]);
@@ -274,9 +283,11 @@ function renderExpanded(): string {
           ${warns}
           <div>price_table ${escapeHtml(v?.price_table_version ?? "—")} · computed_at ${escapeHtml(v?.computed_at ?? "—")} (not import time)</div>
           <div class="footer-note">${
-            dataSource() === "cli"
-              ? "Live spend CLI (notional API estimate). UI does not price."
-              : "Ledger CLI fixtures fallback (notional API estimate). UI does not price."
+            dataSource() === "tauri"
+              ? "Tauri host invoke → spend CLI (notional API estimate). UI does not price."
+              : dataSource() === "cli"
+                ? "Live spend CLI via /api/ipc (notional API estimate). UI does not price. · debug only"
+                : "Ledger CLI fixtures fallback (notional API estimate). UI does not price."
           }</div>
         </div>
       </div>
@@ -323,6 +334,23 @@ async function setMode(next: PanelMode, notifyHost = true): Promise<void> {
 }
 
 async function wireHostEvents(): Promise<void> {
+  if (!isTauriHost()) return;
+  document.documentElement.classList.add("host-tauri");
+  document.documentElement.dataset.host = "tauri";
+
+  const invoke = getTauriInvoke();
+  if (invoke) {
+    try {
+      const m = String(await invoke("get_panel_mode"));
+      if (m === "collapsed" || m === "expanded") {
+        mode = m;
+        render();
+      }
+    } catch {
+      /* ignore — host may not be ready */
+    }
+  }
+
   const listen = getTauriListen();
   if (!listen) return;
   await listen("panel-set-mode", (e) => {
@@ -337,7 +365,17 @@ async function wireHostEvents(): Promise<void> {
     void loadAll(range);
   });
   await listen("panel-import-stub", () => {
-    console.info("[tokenTracer] Import… is stub until bridge import_run (橋樑)");
+    const inv = getTauriInvoke();
+    if (!inv) {
+      console.info("[tokenTracer] Import… stub (no invoke)");
+      return;
+    }
+    void inv("import_run")
+      .then(() => loadAll(range))
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.info("[tokenTracer] import_run stub:", msg);
+      });
   });
 }
 

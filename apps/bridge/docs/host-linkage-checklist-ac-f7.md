@@ -95,14 +95,17 @@ Align names with `apps/ui/src/api.ts` / SHELL-HOST v0. Stub OK: shell out to con
 
 ## 4. Win tray behavior checklist (README must pin)
 
-- [ ] **Start:** system tray resident + **Collapsed** mini-panel visible (bottom-right / notification-area anchor)
-- [ ] **Left-click tray:** toggle Collapsed ↔ Expanded (show/hide or resize panel)
-- [ ] **Right-click tray menu:** Refresh / Import / Quit
-  - Refresh → re-invoke spend_* (+ optional discover)
+Scaffold / code wiring (Linux box) — **Win 实机 smoke still open**:
+
+- [x] **Start:** system tray resident + **Collapsed** mini-panel visible (bottom-right / notification-area anchor) — coded in `tokentracer-host`
+- [x] **Left-click tray:** toggle Collapsed ↔ Expanded (show/hide or resize panel) — coded; UI listens `panel-set-mode`
+- [x] **Right-click tray menu:** Show panel / Refresh / Import / Quit
+  - Refresh → `panel-refresh` → UI re-fetches spend_*
   - Import → `import_run` stub
   - Quit → exit host process
-- [ ] Panel: always-on-top optional; no taskbar app button preferred (tool window)
-- [ ] Embed `apps/ui` dist (or Vite URL in debug)
+- [x] Panel: always-on-top + skipTaskbar in `tauri.conf.json`
+- [x] Embed `apps/ui` dist (or Vite URL in debug)
+- [ ] **Win 实机 verify** left/right click + anchor (橋樑 assist; rustc≥1.88, WebView2, tauri-cli^2)
 - [ ] macOS menu bar: **HOLD / TODO** (do not block Win tray)
 
 ---
