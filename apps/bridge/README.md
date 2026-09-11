@@ -4,6 +4,25 @@ Windows/WSL discovery bridge POC for **tokenTracer** (role: 橋樑).
 
 Specs: **AC v1.1a ∪ v1.2b**. Path contract: [`CONTRACT-path-list-v0.md`](./CONTRACT-path-list-v0.md) (**path-list-v0.2**).
 
+
+## Live Windows / macOS defaults
+
+When `--fixture` is **not** set:
+
+| Host | Flag omitted | Default |
+|------|--------------|---------|
+| Windows | `--win-user-profile` | `%USERPROFILE%` (`USERPROFILE` env) |
+| Windows | `--win-appdata` | `%APPDATA%` Roaming (`APPDATA` env) |
+| macOS | `--macos-home` | `$HOME` |
+
+So on NB-T3261 / any Windows box:
+
+```bat
+tokentracer-bridge discover --json
+```
+
+picks native Win roots automatically and dual-scans WSL (resolving each distro's `$USER`/`$HOME` → `\\wsl$\<Distro>\home\<user>`). Explicit flags still override env defaults.
+
 ## Build / test (Linux box)
 
 ```bash
