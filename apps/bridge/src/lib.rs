@@ -1,9 +1,11 @@
-//! tokenTracer bridge — Windows/WSL path discovery (AC-F1 / AC-F2 POC).
+//! tokenTracer bridge — Windows/WSL path discovery (AC-F1 / AC-F2 POC)
+//! plus Cursor official Admin credential stub (AC v1.4-cursor-official).
 //!
 //! Dual-scan of Win + WSL agent trees is **mandatory** (AC v1.1a ∪ v1.2b).
 //! Library crate for the Tauri host shell; CLI bin is separate for headless use.
-//! Contract: path-list-v0.2.
+//! Contract: path-list-v0.2; cursor-official-admin-v0.
 
+pub mod cursor_admin;
 pub mod discover;
 pub mod errors;
 pub mod fsutil;
