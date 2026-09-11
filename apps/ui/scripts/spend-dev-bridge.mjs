@@ -11,6 +11,9 @@
  *   TOKENTRACER_EVENTS_MODEL — by-model fixture
  *   TOKENTRACER_IMPORT_STATE — import-meta state path
  *   TOKENTRACER_FORCE_FIXTURES=1 — middleware always 503 (UI uses static mocks)
+ *   TOKENTRACER_SPENDING_ALIGN — OPEN-BIND SpendingAlign fixture (B surface)
+ *   TOKENTRACER_SPENDING_ALIGN_STATE — optional `.token-tracer/spending-align.json`
+ *   TOKENTRACER_ADMIN_EVENTS / TOKENTRACER_ADMIN_SPEND — optional F14 reconcile stub
  */
 import { spawn } from "node:child_process";
 import fs from "node:fs";
@@ -79,6 +82,16 @@ export function defaultPaths(root = resolveLedgerRoot()) {
       root,
       "TOKENTRACER_IMPORT_STATE",
       ".token-tracer/import-meta.json",
+    ),
+    spendingAlign: fixturePath(
+      root,
+      "TOKENTRACER_SPENDING_ALIGN",
+      "apps/ui/src/mock/spending-align-manual-p1.json",
+    ),
+    spendingAlignState: fixturePath(
+      root,
+      "TOKENTRACER_SPENDING_ALIGN_STATE",
+      ".token-tracer/spending-align.json",
     ),
   };
 }
@@ -194,6 +207,24 @@ function sendError(res, status, message) {
  * Connect-style middleware for Vite configureServer / configurePreviewServer.
  * Mounts under /api/ipc/*
  */
+
+/** True when `spend spending-align --help` succeeds (ledger OPEN-BIND CLI). */
+let spendingAlignCliSupported = null;
+async function probeSpendingAlignCli() {
+  if (spendingAlignCliSupported != null) return spendingAlignCliSupported;
+  try {
+    await runSpend(["spending-align", "--help"], { timeoutMs: 60_000 });
+    spendingAlignCliSupported = true;
+  } catch {
+    spendingAlignCliSupported = false;
+  }
+  return spendingAlignCliSupported;
+}
+
+function readJsonFile(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, "utf8"));
+}
+
 export function createSpendIpcMiddleware() {
   return async function spendIpcMiddleware(req, res, next) {
     const url = req.url || "";
@@ -338,6 +369,74 @@ export function createSpendIpcMiddleware() {
           "X-TokenTracer-Source": "cli",
           "X-TokenTracer-Spend-Mode": launcher.mode,
         });
+        return;
+      }
+
+      if (pathname === "/api/ipc/spending_align") {
+        // OPEN-BIND-S1: prefer live CLI when ledger ships `spend spending-align`.
+        // Until then, serve labeled OPEN-BIND fixture (do not fail build / preview).
+        const supported = await probeSpendingAlignCli();
+        if (supported) {
+          try {
+            const statePath = paths.spendingAlignState;
+            const args = ["spending-align", "--json"];
+            if (fs.existsSync(statePath)) {
+              args.push("--state", statePath);
+            }
+            const { json, launcher } = await runSpend(args);
+            sendJson(res, 200, json, {
+              "X-TokenTracer-Source": "cli",
+              "X-TokenTracer-Spend-Mode": launcher.mode,
+              "X-TokenTracer-Spending-Align": "cli",
+            });
+            return;
+          } catch (e) {
+            // fall through to fixture
+            const message = e instanceof Error ? e.message : String(e);
+            console.warn("[spend-dev-bridge] spending-align CLI failed; fixture:", message);
+          }
+        }
+        if (!fs.existsSync(paths.spendingAlign)) {
+          sendError(res, 503, "spending-align fixture missing and CLI unsupported");
+          return;
+        }
+        const json = readJsonFile(paths.spendingAlign);
+        sendJson(res, 200, json, {
+          "X-TokenTracer-Source": "fixture",
+          "X-TokenTracer-Spending-Align": supported ? "cli-fallback-fixture" : "fixture-no-cli",
+        });
+        return;
+      }
+
+      // Optional F14 stub — only when env fixtures present; never blocks B-surface mock.
+      if (pathname === "/api/ipc/official_admin_reconcile") {
+        const events = process.env.TOKENTRACER_ADMIN_EVENTS;
+        const spend = process.env.TOKENTRACER_ADMIN_SPEND;
+        if (!events || !spend || !fs.existsSync(events) || !fs.existsSync(spend)) {
+          sendError(
+            res,
+            404,
+            "official_admin_reconcile stub: set TOKENTRACER_ADMIN_EVENTS + TOKENTRACER_ADMIN_SPEND (F14 optional; B-surface uses spending_align fixture)",
+          );
+          return;
+        }
+        try {
+          const { json, launcher } = await runSpend([
+            "cursor",
+            "official-reconcile",
+            "--events",
+            events,
+            "--spend",
+            spend,
+          ]);
+          sendJson(res, 200, json, {
+            "X-TokenTracer-Source": "cli",
+            "X-TokenTracer-Spend-Mode": launcher.mode,
+          });
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          sendError(res, 503, message);
+        }
         return;
       }
 

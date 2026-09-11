@@ -6,7 +6,7 @@
 | 日期 | 2026-09-11 |
 | 作者 | 儀表 |
 | 對照規格 | AC v1.1／v1.2／v1.1a／v1.3a（F11–F13′／F12）／**AC v1.4-cursor-official（F14–F19）** |
-| 狀態 | **draft** — 待帳本 `spending_align` 欄位與指揮官核對；**不發明 API／不自 PASS** |
+| 狀態 | **draft**（帳本 OPEN-BIND-S1…S4 ✅ → `design/ledger/open-bind-spending-align-v0.md`） — 待帳本 `spending_align` 欄位與指揮官核對；**不發明 API／不自 PASS** |
 | 姊妹契約 | [`spend-summary-binding-v0.4-draft.md`](./spend-summary-binding-v0.4-draft.md) |
 | 前版 | [`mini-panel-ia-v0.md`](./mini-panel-ia-v0.md)（v0.3 定案） |
 
