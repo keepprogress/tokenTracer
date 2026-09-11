@@ -1,0 +1,33 @@
+[package]
+name = "tokentracer-host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "tokenTracer Tauri 2 host — Windows tray + bottom-right mini-panel (AC-F7 / F7′)"
+default-run = "tokentracer-host"
+
+[lib]
+name = "tokentracer_host_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "tokentracer-host"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+# Soft dep: bridge lib for discover later (not required for spend CLI path).
+tokentracer-bridge = { path = "../bridge" }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]

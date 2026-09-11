@@ -1,5 +1,5 @@
 import "./style.css";
-import { spend_total, spend_series, import_status, dataSource } from "./api";
+import { spend_total, spend_series, import_status, dataSource, isTauriHost } from "./api";
 import { mapToMiniPanelVM } from "./bind/mapToMiniPanelVM";
 import type { MiniPanelVM, PanelRangeKind, SpendSummary } from "./types";
 import { DEFAULT_DISCLAIMER } from "./types";
@@ -284,6 +284,63 @@ function renderExpanded(): string {
   `;
 }
 
+
+type TauriListen = (
+  event: string,
+  handler: (event: { payload: unknown }) => void,
+) => Promise<() => void>;
+
+function getTauriListen(): TauriListen | null {
+  if (typeof window === "undefined") return null;
+  const g = window as unknown as {
+    __TAURI__?: { event?: { listen?: TauriListen } };
+  };
+  return g.__TAURI__?.event?.listen?.bind(g.__TAURI__.event) ?? null;
+}
+
+function getTauriInvoke():
+  | ((cmd: string, args?: Record<string, unknown>) => Promise<unknown>)
+  | null {
+  if (typeof window === "undefined") return null;
+  const g = window as unknown as {
+    __TAURI__?: { core?: { invoke?: (c: string, a?: Record<string, unknown>) => Promise<unknown> } };
+  };
+  return g.__TAURI__?.core?.invoke?.bind(g.__TAURI__.core) ?? null;
+}
+
+/** Drive Collapsed/Expanded and notify host to resize window when embedded. */
+async function setMode(next: PanelMode, notifyHost = true): Promise<void> {
+  mode = next;
+  render();
+  if (!notifyHost || !isTauriHost()) return;
+  const invoke = getTauriInvoke();
+  if (!invoke) return;
+  try {
+    await invoke("set_panel_mode", { mode: next });
+  } catch {
+    /* host may already own the resize */
+  }
+}
+
+async function wireHostEvents(): Promise<void> {
+  const listen = getTauriListen();
+  if (!listen) return;
+  await listen("panel-set-mode", (e) => {
+    const raw = String(e.payload ?? "");
+    if (raw === "collapsed" || raw === "expanded") {
+      void setMode(raw, false);
+    } else if (raw === "hidden") {
+      /* window hidden by host; keep last UI mode */
+    }
+  });
+  await listen("panel-refresh", () => {
+    void loadAll(range);
+  });
+  await listen("panel-import-stub", () => {
+    console.info("[tokenTracer] Import… is stub until bridge import_run (橋樑)");
+  });
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -309,11 +366,9 @@ app.addEventListener("click", (ev) => {
 
   const action = actionEl?.dataset.action ?? (t.closest(".collapsed") ? "expand" : null);
   if (action === "expand") {
-    mode = "expanded";
-    render();
+    void setMode("expanded");
   } else if (action === "collapse") {
-    mode = "collapsed";
-    render();
+    void setMode("collapsed");
   } else if (action === "refresh") {
     void loadAll(range);
   }
@@ -321,14 +376,13 @@ app.addEventListener("click", (ev) => {
 
 app.addEventListener("keydown", (ev) => {
   if (ev.key === "Escape" && mode === "expanded") {
-    mode = "collapsed";
-    render();
+    void setMode("collapsed");
   }
   if ((ev.key === "Enter" || ev.key === " ") && (ev.target as HTMLElement).closest(".collapsed")) {
     ev.preventDefault();
-    mode = "expanded";
-    render();
+    void setMode("expanded");
   }
 });
 
+void wireHostEvents();
 void loadAll("all");

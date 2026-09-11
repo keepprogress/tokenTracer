@@ -32,6 +32,9 @@
 
 ## 2. Repo 佈局（暫）
 
+> **Path lock:** monorepo host = `apps/tokenTracer-host`（package `tokentracer-host`）；勿用 `apps/host`。
+
+
 ```text
 /workspace/tokenTracer-bridge   # 橋樑：lib + CLI bin
 /workspace/tokenTracer-ui       # 儀表：webview 前端（本契約消費者）

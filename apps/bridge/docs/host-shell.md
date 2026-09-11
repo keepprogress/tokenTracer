@@ -73,12 +73,14 @@ Mini-panel block `meta.last_import` binds this (IA §4.2).
 ## 4. Crate layout (suggested monorepo)
 
 ```text
-tokenTracer/
-  crates/tokentracer-bridge/   # this POC → library + CLI
-  crates/tokentracer-ledger/   # 帳本
-  apps/tokenTracer-ui/         # 儀表 (/workspace/tokenTracer-ui)
-  apps/tokenTracer-host/       # Tauri 2 host (tray/menu bar)
+tokenTracer/   # /workspace/tokenTracer-main monorepo
+  apps/bridge/              # tokentracer-bridge lib + CLI (this crate)
+  crates/pricing/           # spend CLI / ledger query
+  apps/ui/                  # 儀表 mini-panel frontend
+  apps/tokenTracer-host/    # Tauri 2 host (crate tokentracer-host) — 儀表 owns
 ```
+
+See also [`host-linkage-checklist-ac-f7.md`](./host-linkage-checklist-ac-f7.md).
 
 Host `Cargo.toml` depends on `tokentracer-bridge` and ledger query crates; UI stays in the webview.
 
@@ -90,3 +92,8 @@ Host `Cargo.toml` depends on `tokentracer-bridge` and ledger query crates; UI st
 - Surface TT-F2-\* from discover in Expanded PARTIAL / error banner (never silent empty).
 - Surface TT-F2-006 when a capped `files[]` expand truncates (do not treat as complete).
 - macOS: do **not** require Full Disk Access as hard install prerequisite (AC v1.2b); document as troubleshooting only.
+
+
+## Path lock (2026-09-11)
+
+Host dir: `apps/tokenTracer-host` · package `tokentracer-host` · depends on `tokentracer-bridge`. Do not use `apps/host`.
