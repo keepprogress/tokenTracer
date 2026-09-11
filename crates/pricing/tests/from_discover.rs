@@ -321,3 +321,99 @@ fn wsl_import_path_meta_preferred() {
 
     let _ = fs::remove_dir_all(&dir);
 }
+
+
+#[test]
+fn cross_host_same_vendor_id_both_survive() {
+    // Win processed first historically dropped WSL when vendor ids matched.
+    let dir = tmp_dir("scope-id");
+    let win_file = dir.join("win.jsonl");
+    let wsl_file = dir.join("wsl.jsonl");
+    let line = r#"{"type":"assistant","uuid":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","timestamp":"2026-09-11T00:00:00.000Z","sessionId":"11111111-2222-3333-4444-555555555555","cwd":"/demo","message":{"id":"msg_collision","role":"assistant","model":"claude-sonnet-4-20250514","usage":{"input_tokens":10,"output_tokens":5,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
+    fs::write(&win_file, format!("{line}\n")).unwrap();
+    fs::write(&wsl_file, format!("{line}\n")).unwrap();
+
+    let win_src = DiscoverSource {
+        id: "EC-claude-code-v1:windows:/win/.claude".into(),
+        agent: "claude_code".into(),
+        evidence_card: Some("EC-claude-code-v1".into()),
+        host: "windows".into(),
+        root_path: dir.to_string_lossy().into(),
+        glob: "*.jsonl".into(),
+        files: Some(vec![win_file.to_string_lossy().into()]),
+        file_count: 1,
+        truncated: Some(false),
+        readable: true,
+        status: "ok".into(),
+        meta: None,
+    };
+    let wsl_src = DiscoverSource {
+        id: "EC-claude-code-v1:wsl2:wsl:Ubuntu:/home/.claude".into(),
+        agent: "claude_code".into(),
+        evidence_card: Some("EC-claude-code-v1".into()),
+        host: "wsl2".into(),
+        root_path: dir.to_string_lossy().into(),
+        glob: "*.jsonl".into(),
+        files: Some(vec![wsl_file.to_string_lossy().into()]),
+        file_count: 1,
+        truncated: Some(false),
+        readable: true,
+        status: "ok".into(),
+        meta: None,
+    };
+
+    let discover = DiscoverResult {
+        discovered_at: "2026-09-11T00:00:00Z".into(),
+        host_os: "linux".into(),
+        sources: vec![win_src.clone(), wsl_src.clone()],
+        errors: vec![],
+    };
+
+    let result = import_from_discover_result(
+        &discover,
+        &FromDiscoverOpts {
+            discover_path: dir.join("unused.json"),
+            limit: 0,
+            state_path: dir.join("import-meta.json"),
+            events_out: None,
+            report_out: None,
+        },
+    )
+    .expect("import");
+
+    assert_eq!(
+        result.report.events_upserted, 2,
+        "same vendor message.id across hosts must both survive; got {}",
+        result.report.events_upserted
+    );
+    let ids: Vec<_> = result.events.iter().map(|e| e.id.as_str()).collect();
+    assert!(ids.iter().any(|id| id.starts_with(&format!("{}::", win_src.id))));
+    assert!(ids.iter().any(|id| id.starts_with(&format!("{}::", wsl_src.id))));
+    assert!(result.events.iter().all(|e| {
+        e.meta
+            .as_ref()
+            .and_then(|m| m.get("vendor_event_id"))
+            .and_then(|v| v.as_str())
+            == Some("msg_collision")
+    }));
+    assert_eq!(
+        result
+            .events
+            .iter()
+            .filter(|e| e.meta.as_ref().and_then(|m| m.get("host_os")).and_then(|v| v.as_str())
+                == Some("windows"))
+            .count(),
+        1
+    );
+    assert_eq!(
+        result
+            .events
+            .iter()
+            .filter(|e| e.meta.as_ref().and_then(|m| m.get("host_os")).and_then(|v| v.as_str())
+                == Some("wsl2"))
+            .count(),
+        1
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}

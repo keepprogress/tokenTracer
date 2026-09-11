@@ -17,7 +17,7 @@ pub mod timeutil;
 pub use import::{
     import_from_discover, import_from_discover_result, load_discover_result, DiscoverError,
     DiscoverResult, DiscoverSource, FileListResult, FromDiscoverOpts, FromDiscoverResult,
-    ImportError, ImportReport,
+    ImportError, ImportReport, scope_event_id,
 };
 pub use import_meta::{read_import_meta, record_import, write_import_meta};
 pub use models::*;
