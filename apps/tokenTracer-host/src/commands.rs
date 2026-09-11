@@ -124,10 +124,17 @@ pub fn set_panel_mode(
 #[tauri::command]
 pub fn host_meta() -> Value {
     let paths = spend_cli::SpendPaths::resolve();
+    let platform = std::env::consts::OS;
+    let platform_note = match platform {
+        "macos" => "macOS menu-bar status item (Tauri tray-icon / NSStatusItem equivalent) + dropdown mini-panel (AC-F7′ / AC-F10). Collapsed/Expanded IA shared with Win; not full-page web.",
+        "windows" => "Windows tray + bottom-right mini-panel (AC-F7 / F7′).",
+        _ => "Host shell: tray/menu-bar mini-panel; Linux GUI not an AC v1.2 install target.",
+    };
     json!({
         "host": "tokentracer-host",
         "shell_host": "v0.1",
-        "platform_note": "Windows tray + bottom-right mini-panel (AC-F7). macOS menu bar UNTESTED / later.",
+        "platform": platform,
+        "platform_note": platform_note,
         "ledger_root": paths.root,
         "fixtures": {
             "ranged": paths.ranged,

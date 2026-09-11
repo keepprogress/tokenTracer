@@ -1,9 +1,13 @@
-//! Windows system tray: left-click toggles Collapsed↔Expanded; right-click menu.
+//! System tray / macOS menu-bar status item.
 //!
-//! Behaviors (must match README):
-//! - Left-click: toggle Collapsed ↔ Expanded (show panel if Hidden)
-//! - Right-click menu: Show panel / Refresh / Import / Quit
-//! - macOS menu bar: out of scope / UNTESTED
+//! Platform chrome (must match README):
+//! - **Windows**: left-click toggles Collapsed↔Expanded; right-click menu
+//!   (Show panel / Refresh / Import… / Quit).
+//! - **macOS**: Tauri `tray-icon` = menu-bar / NSStatusItem equivalent.
+//!   Click icon → show Expanded mini-panel (or dismiss if already open);
+//!   context menu: Show panel / Refresh / Import… / Quit.
+//!
+//! Not a full-page browser window — panel is the decorated-less mini webview.
 
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
@@ -25,14 +29,20 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
     let icon = app
         .default_window_icon()
         .cloned()
-        .expect("default window icon required for tray");
+        .expect("default window icon required for tray / menu-bar");
 
-    let _tray = TrayIconBuilder::with_id("main")
+    let builder = TrayIconBuilder::with_id("main")
         .icon(icon)
         .tooltip("tokenTracer")
         .menu(&menu)
-        // Left-click handled by on_tray_icon_event; menu on right-click only.
-        .show_menu_on_left_click(false)
+        // Left-click handled by on_tray_icon_event; menu on right-click / Ctrl-click.
+        .show_menu_on_left_click(false);
+
+    // macOS: treat as template image so the status item follows light/dark menu bar.
+    #[cfg(target_os = "macos")]
+    let builder = builder.icon_as_template(true);
+
+    let _tray = builder
         .on_menu_event(|app, event| match event.id().as_ref() {
             "show" => {
                 if let Some(state) = app.try_state::<PanelState>() {
@@ -55,11 +65,16 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
+                rect,
                 ..
-            } = event
+            } = &event
             {
                 let app = tray.app_handle();
                 if let Some(state) = app.try_state::<PanelState>() {
+                    #[cfg(target_os = "macos")]
+                    panel::remember_tray_rect(&state, rect);
+                    #[cfg(not(target_os = "macos"))]
+                    let _ = rect;
                     let _ = panel::toggle_panel(app, &state);
                 }
             }

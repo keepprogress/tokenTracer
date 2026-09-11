@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "tokenTracer Tauri 2 host — Windows tray + bottom-right mini-panel (AC-F7 / F7′)"
+description = "tokenTracer Tauri 2 host — Win tray + macOS menu-bar mini-panel (AC-F7 / F7′ / F10)"
 default-run = "tokentracer-host"
 
 [lib]
