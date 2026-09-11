@@ -1,0 +1,53 @@
+{
+  "totalUsageEventsCount": 3,
+  "usageEventsDisplay": [
+    {
+      "timestamp": "2026-09-10T08:15:00.000Z",
+      "model": "claude-4.5-sonnet",
+      "kind": "composer",
+      "conversationId": "conv-ac14-001",
+      "tokenUsage": {
+        "inputTokens": 126,
+        "outputTokens": 450,
+        "cacheWriteTokens": 6112,
+        "cacheReadTokens": 11964,
+        "totalCents": 20.18232
+      },
+      "chargedCents": 1234.0,
+      "cursorTokenFee": 1.18,
+      "tier": 1
+    },
+    {
+      "timestamp": "2026-09-10T12:00:00.000Z",
+      "model": "composer-1.5",
+      "kind": "composer",
+      "conversationId": "conv-ac14-002",
+      "tokenUsage": {
+        "inputTokens": 2000,
+        "outputTokens": 800,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 500,
+        "totalCents": 5.0
+      },
+      "chargedCents": 567.0,
+      "cursorTokenFee": 0.5,
+      "tier": 2
+    },
+    {
+      "timestamp": "2026-09-11T01:30:00.000Z",
+      "model": "grok-4.6",
+      "kind": "chat",
+      "conversationId": "conv-ac14-003",
+      "tokenUsage": {
+        "inputTokens": 900,
+        "outputTokens": 120,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 0,
+        "totalCents": 1.8
+      },
+      "chargedCents": 199.0,
+      "cursorTokenFee": 0.2,
+      "tier": 1
+    }
+  ]
+}

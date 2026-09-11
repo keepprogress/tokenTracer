@@ -1,0 +1,26 @@
+{
+  "teamMemberSpend": [
+    {
+      "userId": 101,
+      "name": "fixture-user-a",
+      "email": "a@example.com",
+      "role": "member",
+      "spendCents": 1500,
+      "fastPremiumRequests": 12,
+      "hardLimitOverrideDollars": 0
+    },
+    {
+      "userId": 102,
+      "name": "fixture-user-b",
+      "email": "b@example.com",
+      "role": "member",
+      "spendCents": 500,
+      "fastPremiumRequests": 3,
+      "hardLimitOverrideDollars": 0
+    }
+  ],
+  "subscriptionCycleStart": "2026-09-01T00:00:00.000Z",
+  "totalMembers": 2,
+  "totalPages": 1,
+  "overallSpendCents": 2000
+}
