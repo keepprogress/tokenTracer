@@ -19,6 +19,8 @@
 | [AC-v1.2b.md](./AC-v1.2b.md) | **已核准** | macOS 欄（文件級 CONFIRMED*） |
 | [AC-v1.3.md](./AC-v1.3.md) | **已核准** | by_model、官方 API notional |
 | [AC-v1.3a.md](./AC-v1.3a.md) | **已核准** | Other Models＝`usage_pool` |
+| [AC-v1.3b.md](./AC-v1.3b.md) | **待核准** | F3：訂正 +347 誤讀；`/mnt/c` 資料面可對齊；Win-native＝進程契約；OPEN-F3-DEDUP |
+| [AC-v1.4-cursor-official.md](./AC-v1.4-cursor-official.md) | **已核准** | official_admin／Ultra PARTIAL／undocumented 預設關；OPEN-C1…C5 已填 |
 
 ## 仍 OPEN（節選）
 
@@ -27,6 +29,8 @@
 | OPEN-R1 | **關閉** — repo 已上線 |
 | v1.2c | 留給 macOS **實機** dump 升格 |
 | OPEN-P3…P5 | 見 AC v1.3（價表維護等） |
+| AC-v1.4-cursor-official | **已核准** — 實作交接帳本／儀表／橋樑 |
+| AC-v1.3b | **待核准** — F3 去重註記修訂稿 |
 
 ## 證據
 

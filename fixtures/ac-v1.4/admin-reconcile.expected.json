@@ -1,0 +1,11 @@
+{
+  "events_charged_cents_sum": 2000.0,
+  "events_charged_usd": 20.0,
+  "spend_overall_cents": 2000.0,
+  "spend_overall_usd": 20.0,
+  "delta_usd": 0.0,
+  "tolerance_usd": 0.01,
+  "matched": true,
+  "event_count": 3,
+  "spend_member_count": 2
+}
