@@ -11,8 +11,8 @@
  *   TOKENTRACER_EVENTS_MODEL — by-model fixture
  *   TOKENTRACER_IMPORT_STATE — import-meta state path
  *   TOKENTRACER_FORCE_FIXTURES=1 — middleware always 503 (UI uses static mocks)
- *   TOKENTRACER_SPENDING_ALIGN — OPEN-BIND SpendingAlign fixture (B surface)
- *   TOKENTRACER_SPENDING_ALIGN_STATE — optional `.token-tracer/spending-align.json`
+ *   TOKENTRACER_SPENDING_ALIGN — OPEN-BIND SpendingAlign fixture (B fallback only)
+ *   TOKENTRACER_SPENDING_ALIGN_STATE — `.token-tracer/spending-align.json` for CLI --state
  *   TOKENTRACER_ADMIN_EVENTS / TOKENTRACER_ADMIN_SPEND — optional F14 reconcile stub
  */
 import { spawn } from "node:child_process";
@@ -208,12 +208,47 @@ function sendError(res, status, message) {
  * Mounts under /api/ipc/*
  */
 
+/** Run spend and resolve on exit 0 without requiring JSON stdout (e.g. --help). */
+function runSpendExitOk(cliArgs, { timeoutMs = 120_000 } = {}) {
+  const root = resolveLedgerRoot();
+  const launcher = resolveSpendLauncher(root);
+  const args = [...launcher.argsPrefix, ...cliArgs];
+  return new Promise((resolve, reject) => {
+    const child = spawn(launcher.cmd, args, {
+      cwd: launcher.cwd,
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      reject(new Error(`spend CLI timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (d) => {
+      stderr += d;
+    });
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code !== 0) {
+        reject(new Error(`spend exited ${code}: ${stderr.trim() || "(no output)"}`));
+        return;
+      }
+      resolve(true);
+    });
+  });
+}
+
 /** True when `spend spending-align --help` succeeds (ledger OPEN-BIND CLI). */
 let spendingAlignCliSupported = null;
 async function probeSpendingAlignCli() {
   if (spendingAlignCliSupported != null) return spendingAlignCliSupported;
   try {
-    await runSpend(["spending-align", "--help"], { timeoutMs: 60_000 });
+    await runSpendExitOk(["spending-align", "--help"], { timeoutMs: 60_000 });
     spendingAlignCliSupported = true;
   } catch {
     spendingAlignCliSupported = false;
@@ -373,16 +408,14 @@ export function createSpendIpcMiddleware() {
       }
 
       if (pathname === "/api/ipc/spending_align") {
-        // OPEN-BIND-S1: prefer live CLI when ledger ships `spend spending-align`.
-        // Until then, serve labeled OPEN-BIND fixture (do not fail build / preview).
+        // OPEN-BIND-S1 B surface: prefer live
+        //   spend spending-align --json [--state .token-tracer/spending-align.json]
+        // Fixture only on failure / missing bin / FORCE_FIXTURES. Never invent pct.
         const supported = await probeSpendingAlignCli();
         if (supported) {
           try {
             const statePath = paths.spendingAlignState;
-            const args = ["spending-align", "--json"];
-            if (fs.existsSync(statePath)) {
-              args.push("--state", statePath);
-            }
+            const args = ["spending-align", "--json", "--state", statePath];
             const { json, launcher } = await runSpend(args);
             sendJson(res, 200, json, {
               "X-TokenTracer-Source": "cli",
@@ -416,7 +449,7 @@ export function createSpendIpcMiddleware() {
           sendError(
             res,
             404,
-            "official_admin_reconcile stub: set TOKENTRACER_ADMIN_EVENTS + TOKENTRACER_ADMIN_SPEND (F14 optional; B-surface uses spending_align fixture)",
+            "official_admin_reconcile stub: set TOKENTRACER_ADMIN_EVENTS + TOKENTRACER_ADMIN_SPEND (F14 optional; B-surface uses spend spending-align)",
           );
           return;
         }

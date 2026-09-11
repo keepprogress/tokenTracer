@@ -7,6 +7,7 @@ commands.allow = [
   "spend_by_model",
   "spend_by_pool",
   "import_status",
+  "spending_align",
   "discover",
   "import_run",
   "get_panel_mode",

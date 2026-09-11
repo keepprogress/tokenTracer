@@ -32,6 +32,7 @@ Windows **系統托盤 + 右下角迷你面板**宿主（AC-F7 / F7′ · SHELL-
 | Command | 實作 |
 |---------|------|
 | `spend_total` / `spend_series` / `spend_by_model` / `spend_by_pool` / `import_status` | spawn `spend` CLI |
+| `spending_align` | B surface: `spend spending-align --json [--state …]` (UI fixture fallback on Err) |
 | `discover` | **in-process** `tokentracer_bridge::discover_paths` |
 | `import_run` | stub（帳本 record_import 後續） |
 | `get_panel_mode` / `set_panel_mode` / `host_meta` | 殼控制 |

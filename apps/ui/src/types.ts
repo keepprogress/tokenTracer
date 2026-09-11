@@ -154,7 +154,7 @@ export type SpendingAlignSourceMode =
   | "official_admin"
   | "undocumented_opt_in";
 
-/** Wire payload — OPEN-BIND SpendingAlign (fixture / future `spend spending-align --json`). */
+/** Wire payload — OPEN-BIND SpendingAlign (`spend spending-align --json` / fixture fallback). */
 export interface SpendingAlign {
   schema_version?: "spending-align/v0" | string;
   cursor_models_pct: number | null;

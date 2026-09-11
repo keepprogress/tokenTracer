@@ -80,6 +80,12 @@ pub fn import_status() -> Result<Value, IpcError> {
     spend_cli::import_status().map_err(IpcError::cli)
 }
 
+/// B-surface: `spend spending-align --json` (OPEN-BIND). UI falls back to fixture on Err.
+#[tauri::command]
+pub fn spending_align() -> Result<Value, IpcError> {
+    spend_cli::spending_align().map_err(IpcError::cli)
+}
+
 /// In-process bridge discover (tokentracer-bridge lib — not a subprocess).
 #[tauri::command]
 pub fn discover() -> Result<Value, IpcError> {
@@ -128,6 +134,7 @@ pub fn host_meta() -> Value {
             "pool": paths.pool,
             "model": paths.model,
             "import_state": paths.import_state,
+            "spending_align_state": paths.spending_align_state,
         }
     })
 }
