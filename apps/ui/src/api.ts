@@ -1,9 +1,12 @@
 /**
- * Mock IPC surface — same command names as shell-host-contract-v0.
- * Spend totals / series come from real ledger CLI JSON (refresh-from-ledger.sh):
- * `spend by-pool|series --range <kind>` on fixtures/ac-v1.3a/cursor-pools-ranged.json.
- * Real host will swap these for Tauri `invoke`.
- * No invented / scaled prices.
+ * Shell-host IPC surface (SHELL-HOST v0).
+ *
+ * Primary path (dev / vite preview): fetch `/api/ipc/*` which shells out to the
+ * real `spend` CLI via `scripts/spend-dev-bridge.mjs` — no invented prices.
+ * Fallback: bundled `src/mock/*.json` from `refresh-from-ledger.sh` when CLI /
+ * bridge is unavailable (static build, Tauri-not-ready, FORCE_FIXTURES).
+ *
+ * Command names match shell-host-contract-v0; Tauri host will swap to `invoke`.
  */
 import type { Currency, DailySpendSeries, ImportMeta, PanelRangeKind, RangeKind, SpendSummary } from "./types";
 
@@ -20,7 +23,16 @@ import series30d from "./mock/spend-series-30d.json";
 import series90d from "./mock/spend-series-90d.json";
 import importStatusFixture from "./mock/import-status.json";
 
-/** Per-range SpendSummary from real `spend by-pool --range <kind>`. */
+export type DataSource = "cli" | "fixture";
+
+let lastSource: DataSource = "fixture";
+
+/** Last successful IPC source (cli = live spend bridge, fixture = static mock). */
+export function dataSource(): DataSource {
+  return lastSource;
+}
+
+/** Per-range SpendSummary from real `spend by-pool --range <kind>` (fixture fallback). */
 const TOTALS: Record<RangeKind, SpendSummary> = {
   today: spendToday as SpendSummary,
   all: spendAll as SpendSummary,
@@ -37,9 +49,7 @@ const SERIES: Record<PanelRangeKind, DailySpendSeries> = {
   "90d": series90d as DailySpendSeries,
 };
 
-function delay(ms = 40): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
+const IPC_BASE = "/api/ipc";
 
 function cloneSummary(base: SpendSummary, currency: Currency): SpendSummary {
   return {
@@ -52,43 +62,84 @@ function cloneSummary(base: SpendSummary, currency: Currency): SpendSummary {
   };
 }
 
-/** Aligns CLI: `spend by-pool --range … --currency …` (fixtures from ledger CLI). */
+async function tryLiveJson<T>(
+  command: string,
+  query: Record<string, string>,
+): Promise<T | null> {
+  // File:// / Tauri without host: relative /api/ipc is meaningless.
+  if (typeof window !== "undefined" && window.location?.protocol === "file:") {
+    return null;
+  }
+  try {
+    const qs = new URLSearchParams(query).toString();
+    const url = qs ? `${IPC_BASE}/${command}?${qs}` : `${IPC_BASE}/${command}`;
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!res.ok) return null;
+    const data = (await res.json()) as T;
+    lastSource = "cli";
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+/** Aligns CLI: `spend by-pool --range … --currency …` */
 export async function spend_total(
   range: RangeKind,
   currency: Currency = "USD",
 ): Promise<SpendSummary> {
-  await delay();
+  const live = await tryLiveJson<SpendSummary>("spend_total", { range, currency });
+  if (live) return live;
+  lastSource = "fixture";
   const base = TOTALS[range];
   if (!base) throw new Error(`unknown range: ${range}`);
   return cloneSummary(base, currency);
 }
 
 /**
- * Real ledger `spend by-model` JSON (fixtures/ac-v1.3/by-model.json).
+ * Real ledger `spend by-model` JSON.
  * Multi-agent sample; may lack dual Cursor pools.
  */
-export async function spend_by_model(currency: Currency = "USD"): Promise<SpendSummary> {
-  await delay();
+export async function spend_by_model(
+  currency: Currency = "USD",
+  range: RangeKind = "all",
+): Promise<SpendSummary> {
+  const live = await tryLiveJson<SpendSummary>("spend_by_model", { currency, range });
+  if (live) return live;
+  lastSource = "fixture";
   return cloneSummary(ledgerByModel as SpendSummary, currency);
 }
 
 /**
- * Real ledger `spend by-pool` JSON (fixtures/ac-v1.3a/cursor-pools.json).
- * Dual-pool fixture (all / non-ranged).
+ * Real ledger `spend by-pool` JSON (dual-pool / ranged).
  */
-export async function spend_by_pool(currency: Currency = "USD"): Promise<SpendSummary> {
-  await delay();
-  return cloneSummary(ledgerByPool as SpendSummary, currency);
+export async function spend_by_pool(
+  currency: Currency = "USD",
+  range: RangeKind = "all",
+): Promise<SpendSummary> {
+  const live = await tryLiveJson<SpendSummary>("spend_by_pool", { currency, range });
+  if (live) return live;
+  lastSource = "fixture";
+  if (range === "all") return cloneSummary(ledgerByPool as SpendSummary, currency);
+  const base = TOTALS[range];
+  if (!base) throw new Error(`unknown range: ${range}`);
+  return cloneSummary(base, currency);
 }
 
-/** Aligns CLI: `spend series --grain day --range …` (fixtures from ledger CLI). */
+/** Aligns CLI: `spend series --grain day --range …` */
 export async function spend_series(
   grain: "day",
   range: PanelRangeKind,
   currency: Currency = "USD",
 ): Promise<DailySpendSeries> {
-  await delay();
   if (grain !== "day") throw new Error("v0 grain is day only");
+  const live = await tryLiveJson<DailySpendSeries>("spend_series", {
+    grain,
+    range,
+    currency,
+  });
+  if (live) return live;
+  lastSource = "fixture";
   const base = SERIES[range];
   if (!base) throw new Error(`unknown series range: ${range}`);
   return {
@@ -100,7 +151,9 @@ export async function spend_series(
 
 /** Aligns CLI: `import status --json` */
 export async function import_status(): Promise<ImportMeta> {
-  await delay();
+  const live = await tryLiveJson<ImportMeta>("import_status", {});
+  if (live) return live;
+  lastSource = "fixture";
   return { ...(importStatusFixture as ImportMeta) };
 }
 
@@ -110,4 +163,5 @@ export const mockApi = {
   spend_by_pool,
   spend_series,
   import_status,
+  dataSource,
 };

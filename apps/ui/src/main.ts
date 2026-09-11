@@ -1,5 +1,5 @@
 import "./style.css";
-import { spend_total, spend_series, import_status } from "./api";
+import { spend_total, spend_series, import_status, dataSource } from "./api";
 import { mapToMiniPanelVM } from "./bind/mapToMiniPanelVM";
 import type { MiniPanelVM, PanelRangeKind, SpendSummary } from "./types";
 import { DEFAULT_DISCLAIMER } from "./types";
@@ -87,7 +87,7 @@ async function loadAll(nextRange: PanelRangeKind = range): Promise<void> {
       importMeta: null,
       panelRange: nextRange,
       load_state: "error",
-      error: { code: "mock_load", message },
+      error: { code: "ipc_load", message },
     });
   } finally {
     loading = false;
@@ -273,7 +273,11 @@ function renderExpanded(): string {
           <div><strong style="color:var(--text)">Last import</strong> · ${fmtTaipei(v?.last_imported_at ?? null)}</div>
           ${warns}
           <div>price_table ${escapeHtml(v?.price_table_version ?? "—")} · computed_at ${escapeHtml(v?.computed_at ?? "—")} (not import time)</div>
-          <div class="footer-note">Ledger CLI fixtures (notional API estimate). UI does not price.</div>
+          <div class="footer-note">${
+            dataSource() === "cli"
+              ? "Live spend CLI (notional API estimate). UI does not price."
+              : "Ledger CLI fixtures fallback (notional API estimate). UI does not price."
+          }</div>
         </div>
       </div>
     </div>
