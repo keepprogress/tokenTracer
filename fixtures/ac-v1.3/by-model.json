@@ -1,0 +1,49 @@
+[
+  {
+    "id": "msg_dedup_test",
+    "agent": "claude_code",
+    "source": "EC-claude-code-v1",
+    "ts": "2026-09-11T01:00:01.500Z",
+    "model": "claude-sonnet-4-20250514",
+    "input_tokens": 10000,
+    "output_tokens": 2000,
+    "cache_read_tokens": 100000,
+    "cache_write_tokens": 8000,
+    "meta": {
+      "evidence": "EC-claude-code-v1"
+    }
+  },
+  {
+    "id": "resp_fixture_codex_1",
+    "agent": "codex",
+    "source": "EC-codex-v1",
+    "ts": "2026-09-11T02:00:05.000Z",
+    "model": "gpt-5-codex",
+    "input_tokens": 12000,
+    "output_tokens": 400,
+    "cache_read_tokens": 8000,
+    "cache_write_tokens": 0,
+    "meta": {
+      "evidence": "EC-codex-v1"
+    }
+  },
+  {
+    "id": "cursor_agg_opus",
+    "agent": "cursor",
+    "source": "EC-cursor-other-models-v1",
+    "ts": "2026-09-11T03:00:00.000Z",
+    "model": "claude-4.6-opus-high-thinking",
+    "usage_pool": "other_models",
+    "input_tokens": 66,
+    "output_tokens": 6074,
+    "cache_read_tokens": 1952379,
+    "cache_write_tokens": 120467,
+    "raw_cost_usd": 1.88128825,
+    "meta": {
+      "cost_nature": "vendor_reported",
+      "tier": 1,
+      "evidence": "EC-cursor-other-models-v1",
+      "note": "tier 1 \u2192 other_models (PARTIAL community map); concrete modelIntent"
+    }
+  }
+]

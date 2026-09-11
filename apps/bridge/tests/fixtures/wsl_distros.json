@@ -1,0 +1,16 @@
+[
+  {
+    "name": "Ubuntu-Work",
+    "state": "Running",
+    "version": "2",
+    "wsl_user": "t3261",
+    "linux_home_relative": "wsl_ubuntu/home/t3261"
+  },
+  {
+    "name": "Ubuntu",
+    "state": "Stopped",
+    "version": "2",
+    "wsl_user": "t3261",
+    "linux_home_relative": "wsl_ubuntu/home/t3261"
+  }
+]

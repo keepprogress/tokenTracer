@@ -1,0 +1,55 @@
+[
+  {
+    "id": "cursor_composer",
+    "agent": "cursor",
+    "source": "EC-cursor-other-models-v1",
+    "ts": "2026-09-11T04:00:00.000Z",
+    "model": "composer-1.5",
+    "usage_pool": "cursor_models",
+    "input_tokens": 3200018,
+    "output_tokens": 497699,
+    "cache_read_tokens": 90338912,
+    "raw_cost_usd": 27.8259541,
+    "meta": {
+      "cost_nature": "vendor_reported",
+      "tier": 2,
+      "evidence": "EC-cursor-other-models-v1",
+      "note": "tier 2 \u2192 cursor_models (PARTIAL)"
+    }
+  },
+  {
+    "id": "cursor_opus_other_pool",
+    "agent": "cursor",
+    "source": "EC-cursor-other-models-v1",
+    "ts": "2026-09-11T04:01:00.000Z",
+    "model": "claude-4.6-opus-high-thinking",
+    "usage_pool": "other_models",
+    "input_tokens": 66,
+    "output_tokens": 6074,
+    "cache_read_tokens": 1952379,
+    "cache_write_tokens": 120467,
+    "raw_cost_usd": 1.88128825,
+    "meta": {
+      "cost_nature": "vendor_reported",
+      "tier": 1,
+      "evidence": "EC-cursor-other-models-v1",
+      "note": "tier 1 \u2192 other_models (PARTIAL); model is concrete id not Other"
+    }
+  },
+  {
+    "id": "cursor_grok_other_pool",
+    "agent": "cursor",
+    "source": "EC-cursor-other-models-v1",
+    "ts": "2026-09-11T04:02:00.000Z",
+    "model": "grok-4.6",
+    "usage_pool": "other_models",
+    "input_tokens": 1000,
+    "output_tokens": 200,
+    "raw_cost_usd": 0.05,
+    "meta": {
+      "cost_nature": "vendor_reported",
+      "tier": 1,
+      "note": "concrete model + usage_pool=other_models both distinct"
+    }
+  }
+]

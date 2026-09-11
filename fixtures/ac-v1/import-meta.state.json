@@ -1,0 +1,11 @@
+{
+  "last_imported_at": "2026-09-11T06:26:51.025Z",
+  "last_import_source_ids": [
+    "EC-claude-code-v1",
+    "EC-codex-v1"
+  ],
+  "parse_error_count": 0,
+  "events_upserted": 3,
+  "ledger_path": "fixtures/ac-v1/import-meta.state.json",
+  "schema_version": "import-meta/v0"
+}

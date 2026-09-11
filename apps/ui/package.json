@@ -1,0 +1,16 @@
+{
+  "name": "tokentracer-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "tokenTracer mini-panel UI shell (儀表). Consumes SpendSummary fixtures only — does not price.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.3",
+    "vite": "^5.4.11"
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "currency": "USD",
+  "total": 2.021288,
+  "by_agent": [
+    {
+      "agent": "claude_code",
+      "amount": 0.12,
+      "status": "ok"
+    },
+    {
+      "agent": "codex",
+      "amount": 0.02,
+      "status": "ok"
+    },
+    {
+      "agent": "cursor",
+      "amount": 1.881288,
+      "status": "partial"
+    }
+  ],
+  "by_model": [
+    {
+      "model": "claude-4.6-opus-high-thinking",
+      "agent": "cursor",
+      "usage_pool": "other_models",
+      "amount": 1.881288,
+      "input_tokens": 66,
+      "output_tokens": 6074,
+      "priced": true
+    },
+    {
+      "model": "claude-sonnet-4-20250514",
+      "agent": "claude_code",
+      "amount": 0.12,
+      "input_tokens": 10000,
+      "output_tokens": 2000,
+      "priced": true,
+      "price_table_row": "claude-sonnet-4-20250514"
+    },
+    {
+      "model": "gpt-5-codex",
+      "agent": "codex",
+      "amount": 0.02,
+      "input_tokens": 12000,
+      "output_tokens": 400,
+      "priced": true,
+      "price_table_row": "gpt-5-codex"
+    }
+  ],
+  "by_usage_pool": [
+    {
+      "agent": "cursor",
+      "pool": "other_models",
+      "amount": 1.881288
+    }
+  ],
+  "price_table_version": "2026-09-11.v2",
+  "pricing_mode": "notional_api_estimate",
+  "disclaimer": "Notional estimate from public API list prices (price_table_version). Not a subscription invoice, credit-card charge, or vendor bill. Subscription plans (Claude Pro/Max, ChatGPT Plus/Pro, Cursor) are not invoices.",
+  "range": {
+    "kind": "all"
+  },
+  "computed_at": "2026-09-11T06:43:29.337Z",
+  "cost_nature": "mixed",
+  "price_table_source": "https://platform.claude.com/docs/en/about-claude/pricing; https://openai.com/api/pricing/; https://developers.openai.com/api/docs/pricing"
+}

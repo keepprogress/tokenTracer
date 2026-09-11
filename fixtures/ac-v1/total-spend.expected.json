@@ -1,0 +1,26 @@
+{
+  "currency": "USD",
+  "total": 0.17,
+  "by_agent": [
+    {
+      "agent": "claude_code",
+      "amount": 0.15,
+      "status": "ok"
+    },
+    {
+      "agent": "codex",
+      "amount": 0.02,
+      "status": "ok"
+    }
+  ],
+  "by_model_note": "claude-sonnet-4-20250514 ~0.15; gpt-5-codex ~0.02; no __other__",
+  "price_table_version": "2026-09-11.v2",
+  "pricing_mode": "notional_api_estimate",
+  "cost_nature": "notional_api_estimate",
+  "price_table_source_contains": [
+    "platform.claude.com",
+    "openai.com"
+  ],
+  "tolerance_usd": 0.01,
+  "notes": "See fixtures/ac-v1/README.md for step-by-step arithmetic. by_model \u03a3 priced \u2248 total."
+}

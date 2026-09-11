@@ -1,0 +1,7 @@
+/target/
+/apps/*/target/
+/apps/ui/node_modules/
+/apps/ui/dist/
+*.png
+preview-*.png
+.DS_Store

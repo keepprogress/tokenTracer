@@ -1,0 +1,8 @@
+{
+  "last_imported_at": "2026-09-11T06:02:00.000Z",
+  "last_import_source_ids": ["cursor", "claude_code", "codex"],
+  "parse_error_count": 0,
+  "events_upserted": 1842,
+  "ledger_path": "/example/ledger.sqlite",
+  "schema_version": "import-meta/v0"
+}

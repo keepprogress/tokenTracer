@@ -1,0 +1,23 @@
+[package]
+name = "pricing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "tokenTracer pricing core — UsageEvent models, parsers, notional spend"
+
+[[bin]]
+name = "spend"
+path = "src/bin/spend.rs"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+clap = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+[lib]
+name = "pricing"
+path = "src/lib.rs"

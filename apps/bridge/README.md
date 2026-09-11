@@ -1,0 +1,35 @@
+# tokentracer-bridge
+
+Windows/WSL discovery bridge POC for **tokenTracer** (role: 橋樑).
+
+Specs: **AC v1.1a ∪ v1.2b**. Path contract: [`CONTRACT-path-list-v0.md`](./CONTRACT-path-list-v0.md) (**path-list-v0.2**).
+
+## Build / test (Linux box)
+
+```bash
+cd /workspace/tokenTracer-bridge
+cargo test
+cargo run --example discover_fixtures
+cargo run -- discover --fixture tests/fixtures --json
+# optional incidental expand (cap 32):
+cargo run -- discover --fixture tests/fixtures --list-files --json
+# import expand (default --limit 500; 0 = unlimited):
+cargo run -- files --source-id 'EC-claude-code-v1:wsl2:wsl:Ubuntu-Work:/home/t3261/.claude' --fixture tests/fixtures
+cargo run -- files --source-id 'EC-claude-code-v1:wsl2:wsl:Ubuntu-Work:/home/t3261/.claude' --fixture tests/fixtures --limit 1
+cargo run -- files --source-id 'EC-claude-code-v1:wsl2:wsl:Ubuntu-Work:/home/t3261/.claude' --fixture tests/fixtures --limit 0
+```
+
+## Docs
+
+- `docs/discovery-design.md` — architecture, dual-scan, error codes
+- `docs/host-shell.md` — Tauri 2 tray/menu-bar outline
+- `docs/manual-verify-windows.md` / `scripts/manual-verify-windows.md` — NB-T3261 live steps
+- `docs/live-probe-NB-T3261.md` — live read-only counts
+
+## Library
+
+Host (Tauri 2) links this crate as a **library** (not a long-running subprocess). CLI bin is separate for headless use.
+
+```rust
+use tokentracer_bridge::{discover_paths, config_from_fixture_root, list_files_for_source};
+```

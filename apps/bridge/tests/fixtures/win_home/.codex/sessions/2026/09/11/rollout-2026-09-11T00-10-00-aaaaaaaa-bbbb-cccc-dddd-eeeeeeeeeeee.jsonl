@@ -1,0 +1,2 @@
+{"timestamp":"2026-09-11T00:10:00.000Z","type":"session_meta","payload":{"id":"sess-win","originator":"codex_cli_rs"}}
+{"timestamp":"2026-09-11T00:10:01.000Z","ordinal":1,"type":"token_usage_record","payload":{"response_id":"resp_win_1","session_id":"sess-win","usage":{"input_tokens":100,"cached_input_tokens":40,"cache_write_input_tokens":0,"output_tokens":12,"reasoning_output_tokens":0,"total_tokens":112}}}

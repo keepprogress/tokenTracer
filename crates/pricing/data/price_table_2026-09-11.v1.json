@@ -1,0 +1,59 @@
+{
+  "version": "2026-09-11.v1",
+  "currency": "USD",
+  "unit": "per_1m_tokens",
+  "sources": [
+    "https://platform.claude.com/docs/en/about-claude/pricing",
+    "https://openai.com/api/pricing/",
+    "https://developers.openai.com/api/docs/pricing"
+  ],
+  "notes": "Notional API list prices for spend estimates. Subscription plans (Claude Pro/Max, ChatGPT Plus/Pro, Cursor) are not invoices. gpt-6-astra is an alias pending official list.",
+  "models": {
+    "claude-sonnet-4-20250514": {
+      "input": 3.0,
+      "output": 15.0,
+      "cache_read": 0.30,
+      "cache_write_5m": 3.75
+    },
+    "claude-sonnet-4-5": {
+      "input": 3.0,
+      "output": 15.0,
+      "cache_read": 0.30,
+      "cache_write_5m": 3.75
+    },
+    "claude-sonnet-4-6": {
+      "input": 3.0,
+      "output": 15.0,
+      "cache_read": 0.30,
+      "cache_write_5m": 3.75
+    },
+    "claude-haiku-4-5": {
+      "input": 1.0,
+      "output": 5.0,
+      "cache_read": 0.10,
+      "cache_write_5m": 1.25
+    },
+    "gpt-4o": {
+      "input": 2.50,
+      "output": 10.0,
+      "cache_read": 1.25
+    },
+    "gpt-5": {
+      "input": 1.25,
+      "output": 10.0,
+      "cache_read": 0.125
+    },
+    "gpt-5-codex": {
+      "input": 1.25,
+      "output": 10.0,
+      "cache_read": 0.125
+    },
+    "gpt-6-astra": {
+      "input": 1.25,
+      "output": 10.0,
+      "cache_read": 0.125,
+      "alias_of": "gpt-5",
+      "note": "alias pending official list; notional"
+    }
+  }
+}
