@@ -5,3 +5,6 @@
 *.png
 preview-*.png
 .DS_Store
+
+# Allow documented screenshots
+!docs/screenshots/**/*.png
