@@ -95,4 +95,23 @@ cargo run -p tokentracer-host
 
 | 儀表（本 crate + `apps/ui`） | 橋樑 |
 |-----------------------------|------|
-| UI 狀態機、invoke 消費、tray 選單骨架、webview | Win 錨點／tray L/R 實機驗收、import glue、spend.exe 路徑 |
+| UI 狀態機、invoke 消費、tray 選單骨架、webview、上表四條 README | 環境／路徑協助（WebView2、spend.exe）；**不代跑**托盤四條；結果以驗收官為準 |
+
+---
+
+## 驗收官獨立重跑（PR #8 · AC-F7′ 四條）
+
+> **主驗收面＝本 Tauri 宿主**，不是 Vite `npm run dev`／`preview`（那只是 debug）。  
+> 實作群／橋樑不代跑、不自 PASS；結果以**驗收官**在 **NB-T3261** 重跑為準。  
+> 證據建議目錄：`tokenTracer-evidence/.../pr8-win-tray-20260911/`。
+
+| # | 要驗 | How（Win） | 對照 |
+|---|------|------------|------|
+| **①** | **真 Tauri 托盤**（禁僅 Vite） | `cargo tauri build` 或 `cargo run -p tokentracer-host` 後，系統托盤出現圖示；進程＝`tokentracer-host`／bundle，**不是**瀏覽器開 `127.0.0.1:5173` | AC-F7.3／F7′ |
+| **②** | **收合／展開／開面板** | 左鍵：Collapsed ↔ Expanded；右鍵 **Show panel** 可開；X＝藏托盤不退出；面板在螢幕**右下** | AC-F7.1／F7.2 |
+| **③** | **數字 vs `spend` CLI（F6）** | 面板同一 `range`／`currency` 與 `spend by-pool`（或 `total`）／`series` JSON 對容差；footer／`host_meta` 應顯示 CLI 源，非 fixture | AC-F6／F7.4 |
+| **④** | **F12 notional** | 可見 `pricing_mode=notional_api_estimate`（或等價）＋ disclaimer 文案；金額為 notional，非帳單 | AC-F12／F13′ |
+
+**驗收前置（NB-T3261）**：rustc ≥ 1.88、WebView2、`tauri-cli ^2`、已建 `spend.exe`（`cargo build -p pricing --bin spend --release`）、可選設 `TOKENTRACER_SPEND_BIN`／fixture 路徑。
+
+**明確非目標**：CI 綠 ≠ F7′ PASS；macOS menu bar（F10）＝HOLD；`import_run` 仍 stub。
