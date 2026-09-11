@@ -6,7 +6,7 @@
 //! Contract: path-list-v0.2 — WSL ids embed `wsl:<Distro>:<posix>`.
 
 use crate::errors::{make_error, TT_F2_001, TT_F2_002, TT_F2_003, TT_F2_006};
-use crate::fsutil::probe_glob;
+use crate::fsutil::probe_glob_for_host;
 use crate::types::{
     canonical_root, make_source_id, make_source_id_from_canonical, wsl_canonical_root, AgentId,
     DiscoverConfig, DiscoverError, DiscoverResult, DiscoverSource, EvidenceCard, FileListResult,
@@ -401,6 +401,15 @@ fn scan_macos(
         config,
     );
 
+    // Cursor agent home: ~/.cursor (ai-tracking enrichment; not L1 billing)
+    scan_cursor_agent_home(
+        sources,
+        errors,
+        &home.join(".cursor"),
+        SourceHost::Macos,
+        config,
+    );
+
     let _ = CURSOR_STATE_REL;
     let _ = CODEX_SESSIONS_GLOB;
     let _ = CODEX_ARCHIVED_GLOB;
@@ -416,7 +425,7 @@ fn push_source(
     meta: Option<BTreeMap<String, String>>,
     config: &DiscoverConfig,
 ) {
-    let probe = probe_glob(root, glob, config.file_list_cap);
+    let probe = probe_glob_for_host(root, glob, config.file_list_cap, host);
     if let Some(err) = probe.error {
         errors.push(err);
     }
@@ -676,5 +685,163 @@ mod env_defaults_tests {
         assert!(sources.is_empty());
         assert!(errors.iter().any(|e| e.code == "TT-F2-002"));
         assert!(!errors.iter().any(|e| e.message.contains("unknown") && !e.message.contains("invent")));
+    }
+}
+
+#[cfg(test)]
+mod macos_f10_tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn fake_macos_home() -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!("tt-macos-home-{nanos}"));
+        let _ = fs::remove_dir_all(&home);
+        fs::create_dir_all(home.join(".claude/projects/demo")).unwrap();
+        fs::write(home.join(".claude/projects/demo/s.jsonl"), b"{}\n").unwrap();
+        fs::create_dir_all(home.join(".codex/sessions/2026/09")).unwrap();
+        fs::write(
+            home.join(".codex/sessions/2026/09/rollout-2026-09-11T00-00-00-uuid.jsonl"),
+            b"{}\n",
+        )
+        .unwrap();
+        let global = home.join("Library/Application Support/Cursor/User/globalStorage");
+        fs::create_dir_all(&global).unwrap();
+        fs::write(global.join("state.vscdb"), b"sqlite").unwrap();
+        fs::create_dir_all(home.join(".cursor/ai-tracking")).unwrap();
+        fs::write(home.join(".cursor/ai-tracking/ai.db"), b"db").unwrap();
+        home
+    }
+
+    #[test]
+    fn scan_macos_includes_cursor_agent_home_dot_cursor() {
+        let home = fake_macos_home();
+        let cfg = DiscoverConfig {
+            host_os: HostOs::Macos,
+            macos_home: Some(home.clone()),
+            require_wsl_scan: false,
+            list_files: false,
+            ..DiscoverConfig::default()
+        };
+        let result = discover_paths(&cfg);
+        let cursor_homes: Vec<_> = result
+            .sources
+            .iter()
+            .filter(|s| s.agent == AgentId::Cursor && s.host == SourceHost::Macos)
+            .collect();
+        assert!(
+            cursor_homes
+                .iter()
+                .any(|s| s.root_path.contains("/.cursor/ai-tracking")
+                    || s.root_path.ends_with(".cursor/ai-tracking")),
+            "expected ~/.cursor/ai-tracking source, got: {:?}",
+            cursor_homes.iter().map(|s| &s.root_path).collect::<Vec<_>>()
+        );
+        assert!(
+            cursor_homes.iter().any(|s| s.root_path.contains("globalStorage")),
+            "expected Application Support globalStorage"
+        );
+        let claude = result
+            .sources
+            .iter()
+            .find(|s| s.agent == AgentId::ClaudeCode && s.host == SourceHost::Macos)
+            .expect("claude");
+        let meta = claude.meta.as_ref().expect("meta");
+        assert!(meta.get("live_mac_verification").is_some());
+        assert!(meta
+            .get("ac_v1_2b")
+            .map(|s| s.contains("CONFIRMED"))
+            .unwrap_or(false));
+        for s in &cursor_homes {
+            assert_eq!(s.status, SourceStatus::Partial);
+            let blob = format!("{:?}", s.meta).to_ascii_lowercase();
+            assert!(
+                blob.contains("billed")
+                    || blob.contains("enrichment")
+                    || blob.contains("partial")
+                    || blob.contains("tokencount")
+            );
+        }
+        let _ = fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn missing_macos_paths_are_diagnosable_not_panic() {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!("tt-macos-empty-{nanos}"));
+        let _ = fs::remove_dir_all(&home);
+        fs::create_dir_all(&home).unwrap();
+        let cfg = DiscoverConfig {
+            host_os: HostOs::Macos,
+            macos_home: Some(home.clone()),
+            require_wsl_scan: false,
+            ..DiscoverConfig::default()
+        };
+        let result = discover_paths(&cfg);
+        assert!(!result.sources.is_empty() || !result.errors.is_empty());
+        assert!(result.errors.iter().any(|e| e.code == "TT-F2-003"));
+        for e in &result.errors {
+            assert!(!e.next_step.is_empty());
+        }
+        let _ = fs::remove_dir_all(&home);
+    }
+
+    #[test]
+    fn macos_permission_denied_emits_tt_f10_fda() {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let home = std::env::temp_dir().join(format!("tt-macos-perm-{nanos}"));
+        let _ = fs::remove_dir_all(&home);
+        let claude = home.join(".claude");
+        fs::create_dir_all(&claude).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&claude).unwrap().permissions();
+            perms.set_mode(0o000);
+            fs::set_permissions(&claude, perms).unwrap();
+        }
+        let cfg = DiscoverConfig {
+            host_os: HostOs::Macos,
+            macos_home: Some(home.clone()),
+            require_wsl_scan: false,
+            ..DiscoverConfig::default()
+        };
+        let result = discover_paths(&cfg);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&claude).unwrap().permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&claude, perms).unwrap();
+        }
+        assert!(
+            result
+                .errors
+                .iter()
+                .any(|e| e.code == "TT-F10-FDA" || e.code == "TT-F10-001"),
+            "expected TT-F10-* diagnostic, got {:?}",
+            result.errors
+        );
+        let err = result
+            .errors
+            .iter()
+            .find(|e| e.code.starts_with("TT-F10"))
+            .unwrap();
+        assert!(
+            err.next_step.contains("System Settings")
+                || err.next_step.contains("Full Disk Access")
+        );
+        assert!(err.next_step.to_ascii_lowercase().contains("not required"));
+        let _ = fs::remove_dir_all(&home);
     }
 }

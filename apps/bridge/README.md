@@ -54,3 +54,19 @@ Host (Tauri 2) links this crate as a **library** (not a long-running subprocess)
 ```rust
 use tokentracer_bridge::{discover_paths, config_from_fixture_root, list_files_for_source};
 ```
+
+## macOS paths & FDA (AC-F10 / v1.2b)
+
+| Path | Role |
+|------|------|
+| `~/Library/Application Support/Cursor/.../globalStorage/state.vscdb` | Cursor IDE DB (PARTIAL; **not** L1 billing) |
+| `~/.cursor/` (e.g. `ai-tracking`) | Cursor agent-home enrichment (PARTIAL) |
+| `~/.claude/projects` | Claude Code jsonl |
+| `~/.codex/sessions` | Codex rollout jsonl |
+
+- CONFIRMED\* = path-supported in bridge; **live Mac dump UNKNOWN** until a real Mac re-run.
+- Empty/missing → diagnosable (`TT-F2-003` / Partial), never crash / silent blank.
+- **Full Disk Access is not an install prerequisite.** On PermissionDenied, discover emits **`TT-F10-FDA`** (or `TT-F10-001`) with System Settings steps; Win/WSL keep `TT-F2-004`.
+- No Keychain reads.
+
+Design: [`docs/macos-f10-packaging-v0.md`](./docs/macos-f10-packaging-v0.md). Evidence (no Mac): [`../../evidence/pr18-macos-f10-20260911/`](../../evidence/pr18-macos-f10-20260911/).

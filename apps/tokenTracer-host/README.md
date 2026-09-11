@@ -51,10 +51,13 @@
 
 ### 權限失敗時（可照做）
 
-1. 確認 agent 目錄存在（見 v1.2b 路徑）。  
+1. 確認 agent 目錄存在（見 v1.2b 路徑：Cursor `Application Support` **與** `~/.cursor`；Claude `~/.claude/projects`；Codex `~/.codex/sessions`）。  
 2. 若 macOS 擋讀：系統設定 → **隱私權與安全性** → 視需要開 **檔案與檔案夾**／疑難時才考慮 **完整磁碟取用**（FDA **非**硬安裝前置）。  
-3. 重開 tokenTracer → 點 ↻ Refresh；空態應顯示「尚無匯入…」或 PARTIAL banner，而非空白。  
-4. CLI 對照：`spend total|by-pool|series …` 與面板同 range／currency。
+3. Bridge CLI／discover 應出現 **`TT-F10-FDA`**（或 `TT-F10-001`）與可照做 `next_step`，**不得**靜默 0 資料。  
+4. 重開 tokenTracer → 點 ↻ Refresh；空態應顯示「尚無匯入…」或 PARTIAL banner，而非空白。  
+5. CLI 對照：`spend total|by-pool|series …` 與面板同 range／currency。
+
+> **`.dmg`：** `cargo tauri build` on a **Mac** → `bundle/dmg/*.dmg` → 拖曳至 Applications。Linux agent box **無法**產出真實 `.dmg`。Apple Silicon 必過；Intel best-effort（不擋 PASS）。Menu-bar 行為表由**儀表**維護；橋樑不自 PASS 實機選單列。
 
 ---
 
