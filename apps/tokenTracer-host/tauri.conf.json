@@ -24,7 +24,7 @@
         "transparent": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "visible": true,
+        "visible": false,
         "focus": false,
         "shadow": true
       }
@@ -36,14 +36,16 @@
       "id": "main",
       "iconPath": "icons/tray.png",
       "tooltip": "tokenTracer",
-      "showMenuOnLeftClick": false
+      "showMenuOnLeftClick": false,
+      "iconAsTemplate": true
     }
   },
   "bundle": {
     "active": true,
     "targets": [
       "nsis",
-      "msi"
+      "msi",
+      "dmg"
     ],
     "icon": [
       "icons/32x32.png",
@@ -55,6 +57,23 @@
     "windows": {
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "13.0",
+      "dmg": {
+        "appPosition": {
+          "x": 180,
+          "y": 170
+        },
+        "applicationFolderPosition": {
+          "x": 480,
+          "y": 170
+        },
+        "windowSize": {
+          "width": 660,
+          "height": 400
+        }
       }
     }
   },
