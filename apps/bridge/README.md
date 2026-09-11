@@ -23,6 +23,8 @@ tokentracer-bridge discover --json
 
 picks native Win roots automatically and dual-scans WSL (resolving each distro's `$USER`/`$HOME` → `\\wsl$\<Distro>\home\<user>`). Explicit flags still override env defaults.
 
+WSL sources set `meta.import_path` to the **posix** path (e.g. `/home/<user>/.claude`) by default so import inside that distro needs no remap; UNC remains in `meta.unc_path`.
+
 ## Build / test (Linux box)
 
 ```bash

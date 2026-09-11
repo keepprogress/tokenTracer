@@ -115,7 +115,7 @@ Parse with `splitn(3, ':')` — `canonical_root` may itself contain `:`.
   - `meta.distro` — same Distro string
   - `meta.posix_path` — `/home/<user>/...` only
   - `meta.unc_path` (or `meta.access_unc`) — optional Windows open path `\\wsl$\<Distro>\home\...`
-  - `meta.import_path` — probed mount/UNC path used by the bridge host to read files
+  - `meta.import_path` — **posix** path (same as `meta.posix_path`); default for `spend import from-discover` inside the distro. Probed mount/UNC stays in `meta.unc_path` / `meta.access_unc` for Windows-side open.
 
 **Rules:**
 - `host` ∈ `windows` \| `wsl2` \| `macos` (same strings as `UsageEvent.meta.host_os`)

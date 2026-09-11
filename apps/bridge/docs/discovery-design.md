@@ -51,7 +51,7 @@ WSL distros: **Ubuntu-Work** (Running, default), **Ubuntu** (Stopped). User `t32
 1. UNC: `\\wsl$\<Distro>\home\<user>\.claude\...` (forward-slash form in ids: `//wsl$/...` when used as importer path)
 2. Exec: `wsl -d <Distro> -- <cmd>`
 
-WSL `canonical_root` = `wsl:<Distro>:<posix-abs>` (path-list-v0.2); `meta.posix_path` / `meta.unc_path` / `meta.import_path` carry openable paths. UNC is never the sole id.
+WSL `canonical_root` = `wsl:<Distro>:<posix-abs>` (path-list-v0.2); `meta.import_path` defaults to **posix** (same as `meta.posix_path`); `meta.unc_path` for Win open. UNC is never the sole id.
 
 ---
 
