@@ -273,7 +273,7 @@ function renderExpanded(): string {
           <div><strong style="color:var(--text)">Last import</strong> · ${fmtTaipei(v?.last_imported_at ?? null)}</div>
           ${warns}
           <div>price_table ${escapeHtml(v?.price_table_version ?? "—")} · computed_at ${escapeHtml(v?.computed_at ?? "—")} (not import time)</div>
-          <div class="footer-note">Ledger CLI fixtures (notional API estimate). UI does not price. Range slice awaits CLI --range.</div>
+          <div class="footer-note">Ledger CLI fixtures (notional API estimate). UI does not price.</div>
         </div>
       </div>
     </div>
