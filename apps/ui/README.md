@@ -1,23 +1,32 @@
 # tokenTracer mini-panel UI
 
 Vite + TypeScript vanilla shell for the tokenTracer **mini-panel** (儀表).  
-Consumes **real ledger CLI** `SpendSummary` JSON fixtures (via `refresh-from-ledger.sh`) — **UI does not price**.
+Consumes **real ledger CLI** `SpendSummary` / series JSON fixtures (via `refresh-from-ledger.sh`) — **UI does not price**.
 
 Contracts: UI-IA v0, UI-BIND v0.3, SHELL-HOST v0.
 
 ## Refresh fixtures from ledger CLI
 
-Requires the pricing crate at `/home/box/agent-data/projects/token-spend-tracker` (override with `LEDGER_ROOT`).
+Auto-detects the cargo workspace (this repo at `/workspace/tokenTracer`, or set `LEDGER_ROOT`).
 
 ```bash
+cd /workspace/tokenTracer/apps/ui && ./scripts/refresh-from-ledger.sh
+# or the preview duplicate:
 cd /workspace/tokenTracer-ui && ./scripts/refresh-from-ledger.sh
 ```
 
-What it runs (cwd = token-spend-tracker):
+What it runs (cwd = ledger root):
 
 ```bash
-cargo run -p pricing --bin spend -- by-model --currency USD --events fixtures/ac-v1.3/by-model.json
-cargo run -p pricing --bin spend -- by-pool --currency USD --events fixtures/ac-v1.3a/cursor-pools.json
+cargo run -p pricing --bin spend -- by-model --currency USD \
+  --events fixtures/ac-v1.3/by-model.json
+cargo run -p pricing --bin spend -- by-pool --currency USD \
+  --events fixtures/ac-v1.3a/cursor-pools.json
+# for each kind in all,today,7d,30d,90d:
+cargo run -p pricing --bin spend -- by-pool --currency USD \
+  --events fixtures/ac-v1.3a/cursor-pools-ranged.json --range KIND
+cargo run -p pricing --bin spend -- series --grain day --currency USD \
+  --events fixtures/ac-v1.3a/cursor-pools-ranged.json --range KIND
 ```
 
 Writes pure stdout JSON (human table on stderr is ignored) to:
@@ -25,23 +34,26 @@ Writes pure stdout JSON (human table on stderr is ignored) to:
 | File | Source |
 |------|--------|
 | `src/mock/ledger-by-model.json` | by-model (multi-agent sample) |
-| `src/mock/ledger-by-pool.json` | by-pool (dual Cursor pools — **primary**) |
-| `src/mock/spend-total-{all,today,7d,30d,90d}.json` | same as by-pool; only `range.kind` retagged |
+| `src/mock/ledger-by-pool.json` | by-pool on `cursor-pools.json` (dual pools) |
+| `src/mock/spend-total-{all,today,7d,30d,90d}.json` | real `by-pool --range <kind>` on `cursor-pools-ranged.json` |
+| `src/mock/spend-series-{all,7d,30d,90d}.json` | real `series --grain day --range <kind>` (today skipped) |
 
-**Note:** Range slicing awaits CLI `--range`. Until then all ranges share the same real totals (no invented scaled amounts). Prefer `ledger-by-pool` / cursor-pools for dual-pool UI; `ledger-by-model` is the multi-agent by-model sample.
+No invented / scaled prices. Prefer ranged totals for range chips; `ledger-by-pool` is the same-day dual-pool sample.
 
 ## Preview / build
 
 ```bash
+cd /workspace/tokenTracer/apps/ui && npm install && npm run dev
+# preview duplicate tree:
 cd /workspace/tokenTracer-ui && npm install && npm run dev
 ```
 
 ```bash
-cd /workspace/tokenTracer-ui && npm install && npm run build
+cd /workspace/tokenTracer/apps/ui && npm run build
 ```
 
 Dev server: `http://127.0.0.1:5173/`  
-Preview production build: `cd /workspace/tokenTracer-ui && npm run preview`
+Preview production build: `npm run preview`
 
 ## Features
 
@@ -50,7 +62,7 @@ Preview production build: `cd /workspace/tokenTracer-ui && npm run preview`
 - Range chips: All / 7d / 30d / 90d (re-fetches IPC; no local reprice)
 - By-agent bars + `ok` / `partial` status
 - By-model + Cursor usage pools (`cursor_models` / `other_models`) — no sentinel “Other model” rows
-- Daily trend bars from series `points` (series still mock until CLI series lands)
+- Daily trend bars from real CLI series `points`
 - `last_imported_at` shown in **Asia/Taipei** (never `computed_at`)
 - Cursor **PARTIAL** warning banner
 - Footer / disclaimer from ledger `disclaimer` + `pricing_mode`
@@ -61,10 +73,10 @@ Same command names as shell-host (plus ledger helpers):
 
 | Command | Params | Returns |
 |---------|--------|---------|
-| `spend_total` | `range`, `currency` | `SpendSummary` (real by-pool retagged) |
+| `spend_total` | `range`, `currency` | `SpendSummary` (per-range CLI JSON) |
 | `spend_by_model` | `currency` | `SpendSummary` (`ledger-by-model.json`) |
 | `spend_by_pool` | `currency` | `SpendSummary` (`ledger-by-pool.json`) |
-| `spend_series` | `grain`, `range`, `currency` | `DailySpendSeries` (mock series) |
+| `spend_series` | `grain`, `range`, `currency` | `DailySpendSeries` (per-range CLI JSON) |
 | `import_status` | — | `ImportMeta` |
 
 Fixtures live under `src/mock/*.json`. Mapping: `src/bind/mapToMiniPanelVM.ts`.

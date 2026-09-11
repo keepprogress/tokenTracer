@@ -1,10 +1,10 @@
 {
   "currency": "USD",
-  "total": 29.757242,
+  "total": 29.807242,
   "by_agent": [
     {
       "agent": "cursor",
-      "amount": 29.757242,
+      "amount": 29.807242,
       "status": "partial"
     }
   ],
@@ -31,9 +31,9 @@
       "model": "grok-4.6",
       "agent": "cursor",
       "usage_pool": "other_models",
-      "amount": 0.05,
-      "input_tokens": 1000,
-      "output_tokens": 200,
+      "amount": 0.1,
+      "input_tokens": 2000,
+      "output_tokens": 400,
       "priced": true
     }
   ],
@@ -46,7 +46,7 @@
     {
       "agent": "cursor",
       "pool": "other_models",
-      "amount": 1.931288
+      "amount": 1.981288
     }
   ],
   "price_table_version": "2026-09-11.v2",
@@ -55,7 +55,7 @@
   "range": {
     "kind": "all"
   },
-  "computed_at": "2026-09-11T06:43:29.427Z",
+  "computed_at": "2026-09-11T07:05:13.703Z",
   "cost_nature": "vendor_reported",
   "price_table_source": "https://platform.claude.com/docs/en/about-claude/pricing; https://openai.com/api/pricing/; https://developers.openai.com/api/docs/pricing"
 }

@@ -1,16 +1,31 @@
 #!/usr/bin/env bash
-# Refresh UI mock fixtures from real ledger CLI SpendSummary JSON (UI-BIND v0.3).
+# Refresh UI mock fixtures from real ledger CLI SpendSummary / series JSON (UI-BIND).
 # Does not invent prices — parse stdout JSON only from pricing crate.
+# Each range.kind is produced by `spend … --range <kind>` on cursor-pools-ranged.json.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-LEDGER="${LEDGER_ROOT:-/home/box/agent-data/projects/token-spend-tracker}"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"          # apps/ui
 MOCK="$ROOT/src/mock"
 
-if [[ ! -d "$LEDGER" ]]; then
+# Detect ledger repo root (Cargo workspace with pricing crate).
+if [[ -n "${LEDGER_ROOT:-}" ]]; then
+  LEDGER="$LEDGER_ROOT"
+elif [[ -f "$ROOT/../../Cargo.toml" && -d "$ROOT/../../crates/pricing" ]]; then
+  LEDGER="$(cd "$ROOT/../.." && pwd)"
+elif [[ -f /workspace/tokenTracer/Cargo.toml ]]; then
+  LEDGER="/workspace/tokenTracer"
+else
+  LEDGER="/home/box/agent-data/projects/token-spend-tracker"
+fi
+
+if [[ ! -d "$LEDGER/crates/pricing" ]]; then
   echo "error: ledger project not found at $LEDGER (set LEDGER_ROOT)" >&2
   exit 1
 fi
+
+EVENTS_RANGED="fixtures/ac-v1.3a/cursor-pools-ranged.json"
+EVENTS_POOL="fixtures/ac-v1.3a/cursor-pools.json"
+EVENTS_MODEL="fixtures/ac-v1.3/by-model.json"
 
 mkdir -p "$MOCK"
 TMPDIR_LOCAL="$(mktemp -d)"
@@ -60,52 +75,51 @@ out_path = sys.argv[2]
 with open(out_path, "w", encoding="utf-8") as f:
     json.dump(obj, f, indent=2, ensure_ascii=False)
     f.write("\n")
-print(f"wrote {out_path} total={obj.get('total')} pricing_mode={obj.get('pricing_mode')}")
+total = obj.get("total")
+pts = obj.get("points")
+extra = f" points={len(pts)}" if isinstance(pts, list) else f" total={total}"
+print(f"wrote {out_path} pricing_mode={obj.get('pricing_mode')}{extra}")
 PY
 }
 
-echo "==> by-model (fixtures/ac-v1.3/by-model.json)"
-(
-  cd "$LEDGER"
-  # Human table may appear on stderr — capture stdout only.
-  cargo run -p pricing --bin spend -- by-model --currency USD --events fixtures/ac-v1.3/by-model.json \
-    >"$TMPDIR_LOCAL/by-model.out" 2>"$TMPDIR_LOCAL/by-model.err"
-)
-# Show non-cargo stderr noise (human table) for visibility
-if grep -q 'by_model\|model' "$TMPDIR_LOCAL/by-model.err" 2>/dev/null; then
-  echo "(by-model human table on stderr — ignored; using stdout JSON)"
-fi
+run_spend() {
+  local subcmd="$1"; shift
+  local out_base="$1"; shift
+  (
+    cd "$LEDGER"
+    # Human table may appear on stderr — capture stdout only.
+    cargo run -p pricing --bin spend -- "$subcmd" "$@" \
+      >"$TMPDIR_LOCAL/${out_base}.out" 2>"$TMPDIR_LOCAL/${out_base}.err"
+  )
+}
+
+echo "==> by-model ($EVENTS_MODEL) → ledger-by-model.json"
+run_spend by-model by-model --currency USD --events "$EVENTS_MODEL"
 extract_json_file "$TMPDIR_LOCAL/by-model.out" "$MOCK/ledger-by-model.json"
 
-echo "==> by-pool (fixtures/ac-v1.3a/cursor-pools.json) — primary all summary"
-(
-  cd "$LEDGER"
-  cargo run -p pricing --bin spend -- by-pool --currency USD --events fixtures/ac-v1.3a/cursor-pools.json \
-    >"$TMPDIR_LOCAL/by-pool.out" 2>"$TMPDIR_LOCAL/by-pool.err"
-)
+echo "==> by-pool ($EVENTS_POOL) → ledger-by-pool.json (all, non-ranged fixture)"
+run_spend by-pool by-pool --currency USD --events "$EVENTS_POOL"
 extract_json_file "$TMPDIR_LOCAL/by-pool.out" "$MOCK/ledger-by-pool.json"
 
-# spend-total-*.json: SAME real by-pool totals; only range.kind differs.
-# Honest: CLI --range not wired yet; UI does not invent scaled amounts.
-python3 - "$MOCK" <<'PY'
-import json, sys
-from pathlib import Path
-mock = Path(sys.argv[1])
-pool = json.loads((mock / "ledger-by-pool.json").read_text())
-for kind, name in [
-    ("all", "spend-total-all.json"),
-    ("today", "spend-total-today.json"),
-    ("7d", "spend-total-7d.json"),
-    ("30d", "spend-total-30d.json"),
-    ("90d", "spend-total-90d.json"),
-]:
-    out = dict(pool)
-    out["range"] = {**(pool.get("range") or {}), "kind": kind}
-    path = mock / name
-    path.write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    print(f"wrote {path} range.kind={kind} total={out.get('total')}")
-PY
+# Per-range SpendSummary + series from ranged events (real CLI --range).
+KINDS=(all today 7d 30d 90d)
+for KIND in "${KINDS[@]}"; do
+  echo "==> by-pool --range $KIND ($EVENTS_RANGED) → spend-total-$KIND.json"
+  run_spend by-pool "total-$KIND" --currency USD --events "$EVENTS_RANGED" --range "$KIND"
+  extract_json_file "$TMPDIR_LOCAL/total-$KIND.out" "$MOCK/spend-total-$KIND.json"
+
+  if [[ "$KIND" == "today" ]]; then
+    # Panel has no today series; skip (UI maps panel ranges only).
+    echo "    (skip series for today)"
+    continue
+  fi
+
+  echo "==> series --grain day --range $KIND → spend-series-$KIND.json"
+  run_spend series "series-$KIND" --grain day --currency USD --events "$EVENTS_RANGED" --range "$KIND"
+  extract_json_file "$TMPDIR_LOCAL/series-$KIND.out" "$MOCK/spend-series-$KIND.json"
+done
 
 echo "==> done."
-echo "    spend-total-*.json ← ledger-by-pool (cursor-pools dual pools)."
-echo "    ledger-by-model.json ← by-model multi-agent fixture."
+echo "    spend-total-*.json / spend-series-*.json ← real --range on cursor-pools-ranged.json"
+echo "    ledger-by-pool.json ← cursor-pools.json (all)"
+echo "    ledger-by-model.json ← by-model.json"

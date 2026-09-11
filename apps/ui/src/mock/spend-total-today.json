@@ -1,32 +1,14 @@
 {
   "currency": "USD",
-  "total": 29.757242,
+  "total": 0.05,
   "by_agent": [
     {
       "agent": "cursor",
-      "amount": 29.757242,
+      "amount": 0.05,
       "status": "partial"
     }
   ],
   "by_model": [
-    {
-      "model": "composer-1.5",
-      "agent": "cursor",
-      "usage_pool": "cursor_models",
-      "amount": 27.825954,
-      "input_tokens": 3200018,
-      "output_tokens": 497699,
-      "priced": true
-    },
-    {
-      "model": "claude-4.6-opus-high-thinking",
-      "agent": "cursor",
-      "usage_pool": "other_models",
-      "amount": 1.881288,
-      "input_tokens": 66,
-      "output_tokens": 6074,
-      "priced": true
-    },
     {
       "model": "grok-4.6",
       "agent": "cursor",
@@ -40,22 +22,19 @@
   "by_usage_pool": [
     {
       "agent": "cursor",
-      "pool": "cursor_models",
-      "amount": 27.825954
-    },
-    {
-      "agent": "cursor",
       "pool": "other_models",
-      "amount": 1.931288
+      "amount": 0.05
     }
   ],
   "price_table_version": "2026-09-11.v2",
   "pricing_mode": "notional_api_estimate",
   "disclaimer": "Notional estimate from public API list prices (price_table_version). Not a subscription invoice, credit-card charge, or vendor bill. Subscription plans (Claude Pro/Max, ChatGPT Plus/Pro, Cursor) are not invoices.",
   "range": {
-    "kind": "today"
+    "kind": "today",
+    "start": "2026-09-10T16:00:00.000Z",
+    "end": "2026-09-11T16:00:00.000Z"
   },
-  "computed_at": "2026-09-11T06:43:29.427Z",
+  "computed_at": "2026-09-11T07:05:13.833Z",
   "cost_nature": "vendor_reported",
   "price_table_source": "https://platform.claude.com/docs/en/about-claude/pricing; https://openai.com/api/pricing/; https://developers.openai.com/api/docs/pricing"
 }
