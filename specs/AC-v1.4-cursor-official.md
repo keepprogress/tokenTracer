@@ -6,7 +6,7 @@
 | 狀態 | **已核准**（人類 2026-09-11；可實作；規格不自 PASS） |
 | 日期 | 2026-09-11 |
 | 作者 | 規格 |
-| 證據 | `EC-cursor-official-api-v1`、`EC-cursor-spending-align-v1`（S1–G1）；人類 Ultra 截圖 `screenshots/cursor-spending-ultra-2026-09-11.png` |
+| 證據 | `EC-cursor-official-api-v1`、`EC-cursor-spending-align-v1`（S1–G1）；`EC-open-c6-c9-v1`（C7 已填）；人類 Ultra 截圖 `screenshots/cursor-spending-ultra-2026-09-11.png` |
 | 繼承 | 已核 AC（含 v1.3a `usage_pool`／F12 notional）；**不取代**本機匯入；本版加官方／Spending **對照層** |
 
 ---
@@ -142,15 +142,17 @@ Checklist：
 | **OPEN-C4** | Grok Bot 週額必做？ | UI **CONFIRMED**（截圖週％）；公開 Admin **無**用量％ API → 機器同步 **HOLD／UNKNOWN（G1）** | **F18**：可註 UI 有列；機器同步非本版必做 |
 | **OPEN-C5** | 與 `usage_pool` 雙寫或只對照？ | 事件層維持 F13′ `usage_pool`；Spending 兩池％＝**對照層**（P1／P2）；禁假 `"Other"` model 列 | **F19**：只對照、不雙寫冒充 |
 
-### 仍 OPEN（不擋本版核准敘事；實作可後補）
+### OPEN-C6…C9 追蹤（`EC-open-c6-c9-v1`；**不改已核 F14–F19 條款**）
 
-| ID | 內容 |
-|----|------|
-| OPEN-C6 | Teams≠Enterprise Admin 開通邊界（403 實測） |
-| OPEN-C7 | Admin 事件是否含 Other-Models `tier` 等價欄 |
-| OPEN-C8 | Spending ％ ↔ Ultra 內含 $ 精確換算公式 |
-| OPEN-C9 | Grok Bot 週％穩定機器源（升級 G1） |
-| AC v1.3b | 仍待人類核（獨立） |
+| ID | 狀態 | 規格結論 |
+|----|------|----------|
+| **OPEN-C7** | **已填（docs CONFIRMED）** | Admin `filtered-usage-events` **無** documented `tier`；**禁止**要求 `tier` 才能 ingest。池標籤用 `model`／`kind`／`cursorTokenFee` 等已文件欄；live 是否暗含 `tier`＝UNKNOWN（不擋） |
+| OPEN-C6 | **PARTIAL／HOLD** | Overview＝Enterprise＋403「Enterprise access required」；Teams 定價文矛盾；**無** Teams live 403 樣本 |
+| OPEN-C8 | **PARTIAL／HOLD** | 對齊 **池％**（P1）；％↔$ 精確公式 **UNKNOWN**；Ultra Other≈$400＝staff／舊表 PARTIAL，現 live help 無 $ 表 |
+| OPEN-C9 | **PARTIAL／HOLD** | UI＋help 週額 CONFIRMED；機器＝undocumented `GetSandUsageStatus`／`get-sand-usage-status`（opt-in／fail-soft）；**非**官方契約；F18 機器同步仍非必做 |
+| AC v1.3b | 仍待人類核（獨立） | |
+
+證據：`evidence/EC-open-c6-c9-v1.md`
 
 ### 個人 Ultra 來源階（驗收可引用）
 
@@ -160,7 +162,7 @@ Checklist：
 | C-align-target | Spending UI 兩池％（P1）＋P2 | **CONFIRMED** 正式對齊目標 |
 | C-partial-machine | U1／U2 | **undocumented**；PARTIAL／opt-in |
 | C-block | L1 bubble | **BLOCK** 當帳單／池％ |
-| C-hold | Grok Bot 週％（G1） | UI CONFIRMED；機器 **UNKNOWN** |
+| C-hold | Grok Bot 週％（G1） | UI CONFIRMED；機器 **PARTIAL／UNDOCUMENTED**（C9；非契約） |
 
 ---
 
@@ -170,7 +172,7 @@ Checklist：
 |------|------|
 | **已核准** | **AC v1.4-cursor-official（本文件）** |
 | OPEN-C1…C5 | **已填死**（上表） |
-| 交接 | 帳本／儀表／橋樑依 F14–F19 實作；OPEN-C6…C9 可後補 |
+| 交接 | 帳本／儀表／橋樑依 F14–F19；**OPEN-C7 已填**；C6／C8／C9 仍 HOLD |
 | 不可 | 自 PASS、undocumented 預設開、L1 冒充帳單 |
 
 ---
