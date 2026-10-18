@@ -283,6 +283,9 @@ mod tests {
         assert!(!err.next_step.is_empty());
     }
 
+    // Needs unix permission bits (chmod 000) to provoke PermissionDenied; on Windows
+    // set_mode does not exist and a read-only dir stays readable, so skip there.
+    #[cfg(unix)]
     #[test]
     fn permission_denied_on_macos_maps_to_tt_f10_fda() {
         let nanos = SystemTime::now()

@@ -793,6 +793,9 @@ mod macos_f10_tests {
         let _ = fs::remove_dir_all(&home);
     }
 
+    // Needs unix permission bits (chmod 000) to provoke PermissionDenied; on Windows
+    // set_mode does not exist and a read-only dir stays readable, so skip there.
+    #[cfg(unix)]
     #[test]
     fn macos_permission_denied_emits_tt_f10_fda() {
         let nanos = SystemTime::now()
