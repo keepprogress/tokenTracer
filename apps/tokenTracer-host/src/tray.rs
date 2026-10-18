@@ -40,12 +40,20 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
 
     let menu = Menu::with_items(app, &[&show_i, &refresh_i, &import_i, &sep, &quit_i])?;
 
-    // Menu-bar / tray glyph: dedicated `icons/tray.png` (monochrome, template on macOS).
-    // NOTE: this is the ONLY tray-icon creation site. `tauri.conf.json` must NOT declare
-    // `app.trayIcon` — Tauri would build a second status item with the same id (AC-F10 B1:
-    // two menu-bar icons). Embedding the PNG here keeps the config-side icon/tooltip/
-    // `showMenuOnLeftClick:false`/`iconAsTemplate` semantics in one place.
+    // Tray / menu-bar glyph. NOTE: this is the ONLY tray-icon creation site. `tauri.conf.json`
+    // must NOT declare `app.trayIcon` — Tauri would build a second status item with the same
+    // id (AC-F10 B1: two menu-bar icons).
+    //
+    // * macOS: `icons/tray.png` = monochrome BLACK glyph on a TRANSPARENT background (44x44,
+    //   RGBA, alpha-only information) installed as a *template* image, so AppKit tints it for
+    //   light/dark menu bars. (An opaque colour image as template renders as a solid square.)
+    //   Regenerate with `scripts/gen-tray-template-icon.py`.
+    // * Windows / Linux: `icons/tray-color.png` = opaque coloured icon. A black template glyph
+    //   is nearly invisible on a dark taskbar, so it is NOT used there.
+    #[cfg(target_os = "macos")]
     let icon = Image::from_bytes(include_bytes!("../icons/tray.png"))?;
+    #[cfg(not(target_os = "macos"))]
+    let icon = Image::from_bytes(include_bytes!("../icons/tray-color.png"))?;
 
     let builder = TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
