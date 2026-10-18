@@ -11,3 +11,6 @@ preview-*.png
 
 # Allow Tauri host tray / bundle icons
 !apps/tokenTracer-host/icons/**/*.png
+
+# tauri-build generated schemas (created by any cargo build/check of the host)
+/apps/tokenTracer-host/gen/

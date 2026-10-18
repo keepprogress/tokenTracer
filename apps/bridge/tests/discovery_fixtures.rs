@@ -204,6 +204,8 @@ fn error_catalog_contains_required_codes() {
         "TT-F2-004",
         "TT-F2-005",
         "TT-F2-006",
+        "TT-F10-FDA",
+        "TT-F10-001",
     ] {
         assert!(codes.contains(required), "missing {required}");
     }

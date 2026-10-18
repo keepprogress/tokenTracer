@@ -6,14 +6,14 @@ Open-source **token usage & notional USD spend** tracker for coding agents on **
 
 ## Status
 
-Early scaffold (AC v1.1–v1.3a). Pricing CLI + discovery bridge + mini-panel UI + **Tauri 2 Win tray host**.
+Early scaffold (AC v1.1–v1.3a + **v1.2／v1.2b macOS** + **F10 packaging**). Pricing CLI + discovery bridge + mini-panel UI + **Tauri 2 host** (Win tray + **macOS menu bar** shell). Live Mac smoke: **BLOCKED** until Apple Silicon host.
 
 ## Layout
 
-- `crates/pricing` — Rust ledger / `spend` CLI (`total`, `by-model`, `by-pool`, `series`)
-- `apps/bridge` — Win/WSL/macOS discovery (`tokentracer-bridge` lib + CLI)
+- `crates/pricing` — Rust ledger / `spend` CLI (`total`, `by-model`, `by-pool`, `series`, `spending-align`)
+- `apps/bridge` — Win/WSL/macOS discovery (`tokentracer-bridge` lib + CLI); **macOS paths per AC v1.2b** (unchanged)
 - `apps/ui` — bottom-right / menu-bar mini panel (Vite); consumes ledger JSON via Tauri `invoke` or `/api/ipc`
-- `apps/tokenTracer-host` — **Tauri 2 host** (`tokentracer-host`): Windows **system tray** + bottom-right mini-panel (AC-F7 / F7′)
+- `apps/tokenTracer-host` — **Tauri 2 host** (`tokentracer-host`): Windows **system tray** + macOS **menu bar** mini-panel (AC-F7 / F7′ / **F10**)
 - `specs/` — acceptance criteria
 - `evidence/` — probe cards
 - `fixtures/` — reproducible spend fixtures
@@ -29,7 +29,19 @@ Early scaffold (AC v1.1–v1.3a). Pricing CLI + discovery bridge + mini-panel UI
 | 關閉視窗 | 隱藏到托盤（常駐），不結束；結束用 Quit |
 | 啟動預設 | 托盤常駐 + Collapsed 可見（右下／通知區附近） |
 
-詳見 [`apps/tokenTracer-host/README.md`](apps/tokenTracer-host/README.md)。macOS 選單列：**UNTESTED / later**。
+## macOS menu bar（AC-F7′／AC-F10）— 行為寫死
+
+| 操作 | 行為 |
+|------|------|
+| **點選單列圖示** | 開 Expanded 迷你面板；再點或失焦 → 僅圖示 |
+| **選單** | Show panel / Refresh / Import… / **Quit** |
+| 啟動預設 | 僅選單列圖示（無 Dock）；`ActivationPolicy::Accessory` |
+| 安裝 | **`.dmg` 拖曳安裝**；macOS 13+；Apple Silicon 必過；Intel best-effort |
+| 空／PARTIAL | 必須可診斷（文案／banner），不得靜默空白 |
+
+> Tauri 2 `tray-icon` on macOS = **menu-bar / NSStatusItem** equivalent (platform chrome). Same Collapsed／Expanded IA as Win; **not** full-page web (N5).
+
+詳見 [`apps/tokenTracer-host/README.md`](apps/tokenTracer-host/README.md)。
 
 全頁 localhost Vite UI 僅 **debug only**，不是主驗收面（N5）。
 
@@ -57,7 +69,32 @@ cargo install tauri-cli --version "^2" --locked   # once
 cargo tauri dev    # or: cargo run -p tokentracer-host
 ```
 
-Linux agent box: `cargo check -p tokentracer-host` only as far as system libs allow — **no fake tray PASS screenshots**.
+### macOS host（menu bar + mini-panel + `.dmg`）
+
+```bash
+# Requires Xcode / CLT on a Mac (Apple Silicon preferred)
+cargo build -p pricing --bin spend
+npm --prefix apps/ui ci
+cargo install tauri-cli --version "^2" --locked
+cd apps/tokenTracer-host
+cargo tauri dev
+cargo tauri build   # → target/release/bundle/dmg/*.dmg  (hook builds apps/ui itself)
+shasum -a 256 ../../target/release/bundle/dmg/*.dmg
+# Remote / unattended session: bundle_dmg.sh's Finder AppleScript times out → CI=true cargo tauri build
+```
+
+App is **ad-hoc signed, not notarized**: if Gatekeeper blocks first launch, right-click → Open, or
+`xattr -dr com.apple.quarantine /Applications/tokenTracer.app` (details: `apps/tokenTracer-host/README.md`).
+
+Linux agent box: `cargo check -p tokentracer-host` only as far as system libs allow — **no fake tray / menu-bar PASS screenshots**. **Linux cannot produce a real `.dmg`.**
+
+### macOS packaging / FDA (bridge · AC-F10)
+
+- Install: **`.dmg` 拖曳至 Applications**（`tauri.conf.json` targets include `dmg`; min macOS **13.0**）.
+- Arch: **Apple Silicon 必過**; Intel best-effort (`x86_64-apple-darwin` / Rosetta; does not block PASS).
+- Paths: Cursor `Application Support` **and** `~/.cursor/`; Claude `~/.claude/projects`; Codex `~/.codex/sessions`.
+- FDA: **非預設必要**. PermissionDenied → diagnostic **`TT-F10-FDA`** with System Settings steps; never silent 0 data.
+- Menu-bar UI = **儀表** (`AC-F7′`); bridge does not self-PASS live Mac smoke (see `evidence/pr18-macos-f10-20260911/`).
 
 ## License
 

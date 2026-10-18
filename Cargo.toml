@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
-members = ["crates/pricing", "apps/bridge", "apps/tokenTracer-host"]
+members = ["crates/pricing", "crates/tray-guard", "apps/bridge", "apps/tokenTracer-host"]
 # Host needs GUI/tray deps; default members keep Linux CI lean (pricing + bridge).
-default-members = ["crates/pricing", "apps/bridge"]
+default-members = ["crates/pricing", "crates/tray-guard", "apps/bridge"]
 
 [workspace.package]
 edition = "2021"

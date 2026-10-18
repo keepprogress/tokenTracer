@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "tokenTracer Tauri 2 host — Windows tray + bottom-right mini-panel (AC-F7 / F7′)"
+description = "tokenTracer Tauri 2 host — Win tray + macOS menu-bar mini-panel + .dmg packaging (AC-F7 / F7′ / F10)"
 default-run = "tokentracer-host"
 
 [lib]
@@ -19,7 +19,7 @@ path = "src/main.rs"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
 tauri-plugin-shell = "2"
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -27,6 +27,13 @@ anyhow = { workspace = true }
 thiserror = { workspace = true }
 # Soft dep: bridge lib for discover later (not required for spend CLI path).
 tokentracer-bridge = { path = "../bridge" }
+
+# AC-F10 B2: click-vs-focus-loss arbitration (macOS menu-bar only; pure, unit-tested on Linux CI).
+[target.'cfg(target_os = "macos")'.dependencies]
+tokentracer-tray-guard = { path = "../../crates/tray-guard" }
+# Ctrl-key state for Ctrl+click → context menu (tauri's tray click event has no modifiers).
+# Version/features match what tauri/tray-icon already pull in transitively.
+objc2-app-kit = { version = "0.3", default-features = false, features = ["NSEvent"] }
 
 [features]
 default = ["custom-protocol"]

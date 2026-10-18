@@ -1,0 +1,9 @@
+[package]
+name = "tokentracer-tray-guard"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Pure tray / menu-bar click-vs-focus-loss arbitration for tokentracer-host (AC-F10 B2). No GUI deps, so it is unit-testable on Linux CI."
+
+[dependencies]

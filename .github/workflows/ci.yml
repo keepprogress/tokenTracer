@@ -30,6 +30,9 @@ jobs:
       - name: cargo test -p tokentracer-bridge
         run: cargo test -p tokentracer-bridge
 
+      - name: cargo test -p tokentracer-tray-guard (AC-F10 B2 click arbitration)
+        run: cargo test -p tokentracer-tray-guard
+
       - name: fixture e2e discover→import
         run: |
           chmod +x scripts/e2e-discover-import.sh

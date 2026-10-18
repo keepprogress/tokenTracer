@@ -6,8 +6,14 @@
   "build": {
     "frontendDist": "../ui/dist",
     "devUrl": "http://127.0.0.1:5173",
-    "beforeDevCommand": "npm --prefix ../ui run dev",
-    "beforeBuildCommand": "npm --prefix ../ui run build"
+    "beforeDevCommand": {
+      "script": "npm run dev",
+      "cwd": "../ui"
+    },
+    "beforeBuildCommand": {
+      "script": "npm run build",
+      "cwd": "../ui"
+    }
   },
   "app": {
     "withGlobalTauri": true,
@@ -24,37 +30,49 @@
         "transparent": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "visible": true,
+        "visible": false,
         "focus": false,
         "shadow": true
       }
     ],
     "security": {
       "csp": null
-    },
-    "trayIcon": {
-      "id": "main",
-      "iconPath": "icons/tray.png",
-      "tooltip": "tokenTracer",
-      "showMenuOnLeftClick": false
     }
   },
   "bundle": {
     "active": true,
     "targets": [
       "nsis",
-      "msi"
+      "msi",
+      "dmg"
     ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/icon.png",
-      "icons/henry.w@example.net",
+      "icons/icon.icns",
       "icons/icon.ico"
     ],
     "windows": {
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "13.0",
+      "dmg": {
+        "appPosition": {
+          "x": 180,
+          "y": 170
+        },
+        "applicationFolderPosition": {
+          "x": 480,
+          "y": 170
+        },
+        "windowSize": {
+          "width": 660,
+          "height": 400
+        }
       }
     }
   },
