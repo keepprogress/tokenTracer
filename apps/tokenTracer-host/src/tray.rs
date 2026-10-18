@@ -10,12 +10,16 @@
 //! Not a full-page browser window — panel is the decorated-less mini webview.
 
 use tauri::{
+    image::Image,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager,
 };
 
 use crate::panel::{self, PanelState};
+
+/// Single tray / status-item id (created only in [`install`]).
+pub const TRAY_ID: &str = "main";
 
 pub fn install(app: &AppHandle) -> tauri::Result<()> {
     let show_i = MenuItem::with_id(app, "show", "Show panel", true, None::<&str>)?;
@@ -26,12 +30,14 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
 
     let menu = Menu::with_items(app, &[&show_i, &refresh_i, &import_i, &sep, &quit_i])?;
 
-    let icon = app
-        .default_window_icon()
-        .cloned()
-        .expect("default window icon required for tray / menu-bar");
+    // Menu-bar / tray glyph: dedicated `icons/tray.png` (monochrome, template on macOS).
+    // NOTE: this is the ONLY tray-icon creation site. `tauri.conf.json` must NOT declare
+    // `app.trayIcon` — Tauri would build a second status item with the same id (AC-F10 B1:
+    // two menu-bar icons). Embedding the PNG here keeps the config-side icon/tooltip/
+    // `showMenuOnLeftClick:false`/`iconAsTemplate` semantics in one place.
+    let icon = Image::from_bytes(include_bytes!("../icons/tray.png"))?;
 
-    let builder = TrayIconBuilder::with_id("main")
+    let builder = TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
         .tooltip("tokenTracer")
         .menu(&menu)
