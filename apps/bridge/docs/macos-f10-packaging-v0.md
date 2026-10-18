@@ -13,6 +13,7 @@
 ## 1. Install shape
 
 - **Artifact:** `.dmg` drag-to-Applications (`cargo tauri build` → `target/release/bundle/dmg/*.dmg`).
+- **Build/run notes (build commands, sha256, `CI=true` for unattended sessions, Gatekeeper first-open steps for the ad-hoc-signed, non-notarized `.app`):** see `apps/tokenTracer-host/README.md`.
 - **Config:** `apps/tokenTracer-host/tauri.conf.json` already includes `bundle.targets: dmg` + `macOS.minimumSystemVersion: "13.0"` (儀表 shell commit). Bridge does **not** re-claim universal binary.
 - **OS floor:** macOS **13 Ventura+**.
 - **Arch:** **Apple Silicon required** for PASS; **Intel** (`x86_64-apple-darwin` or Rosetta) = **best-effort**, does not block PASS.

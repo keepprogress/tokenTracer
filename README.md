@@ -74,12 +74,17 @@ cargo tauri dev    # or: cargo run -p tokentracer-host
 ```bash
 # Requires Xcode / CLT on a Mac (Apple Silicon preferred)
 cargo build -p pricing --bin spend
-npm --prefix apps/ui ci && npm --prefix apps/ui run build
-cd apps/tokenTracer-host
+npm --prefix apps/ui ci
 cargo install tauri-cli --version "^2" --locked
+cd apps/tokenTracer-host
 cargo tauri dev
-cargo tauri build   # → bundle/dmg/*.dmg
+cargo tauri build   # → target/release/bundle/dmg/*.dmg  (hook builds apps/ui itself)
+shasum -a 256 ../../target/release/bundle/dmg/*.dmg
+# Remote / unattended session: bundle_dmg.sh's Finder AppleScript times out → CI=true cargo tauri build
 ```
+
+App is **ad-hoc signed, not notarized**: if Gatekeeper blocks first launch, right-click → Open, or
+`xattr -dr com.apple.quarantine /Applications/tokenTracer.app` (details: `apps/tokenTracer-host/README.md`).
 
 Linux agent box: `cargo check -p tokentracer-host` only as far as system libs allow — **no fake tray / menu-bar PASS screenshots**. **Linux cannot produce a real `.dmg`.**
 

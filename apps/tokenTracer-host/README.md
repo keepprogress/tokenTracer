@@ -31,7 +31,8 @@
 
 | 操作 | 行為 |
 |------|------|
-| **點選單列圖示** | 顯示 **Expanded** 迷你面板（對齊 IA）；若已開則 **收合為僅圖示**（Hidden） |
+| **選單列圖示** | **只有 1 個** status item（僅 `tray.rs` 建立；`tauri.conf.json` 不得再宣告 `app.trayIcon`） |
+| **點選單列圖示** | 顯示 **Expanded** 迷你面板（對齊 IA）；若已開則 **收合為僅圖示**（Hidden；點圖示造成的失焦不會把它再開回來，約 300 ms 內視為同一次點擊） |
 | **失焦／點外面** | 面板關閉，回到選單列圖示（常駐） |
 | **右鍵／Ctrl-點選單** | **Show panel**／**Refresh**／**Import…**／**Quit** |
 | 關閉視窗 | 隱藏到選單列（常駐），不結束；結束請用 **Quit** |
@@ -109,15 +110,48 @@ rustup target add aarch64-apple-darwin   # Apple Silicon
 # rustup target add x86_64-apple-darwin
 
 cargo build -p pricing --bin spend
-npm --prefix apps/ui ci && npm --prefix apps/ui run build
+npm --prefix apps/ui ci          # 必須先裝 UI 依賴（build hook 只跑 `npm run build`，不自動 ci）
 cargo install tauri-cli --version "^2" --locked
 
 cd apps/tokenTracer-host
 cargo tauri dev
-# .dmg:
+# .dmg（照這條原指令即可，無需本機覆寫）:
 cargo tauri build
-# → target/release/bundle/dmg/*.dmg  （拖曳至 Applications）
+# → <repo>/target/release/bundle/dmg/tokenTracer_0.1.0_aarch64.dmg  （Intel: …_x64.dmg；拖曳至 Applications）
+# 證據用 sha256（驗收／Mac 管理回報必附）:
+shasum -a 256 ../../target/release/bundle/dmg/*.dmg
 ```
+
+**建置 hook（B3）：** `tauri.conf.json` 的 `beforeBuildCommand`／`beforeDevCommand` 為
+`{ "script": "npm run build|dev", "cwd": "../ui" }`。tauri-cli 在跑 hook 前會先 chdir 到 tauri 目錄
+（`apps/tokenTracer-host`），所以 `../ui` ＝ `apps/ui`，與你從哪個目錄呼叫無關（**不要**再用
+`npm --prefix ../ui`：hook 預設 cwd 是 `apps/`，會解到 `<repo>/ui` 而找不到）。
+
+### 無人值守／遠端 session 建 `.dmg`（D2）
+
+`bundle_dmg.sh` 會用 Finder AppleScript 排視窗／圖示位置；在 **SSH／無人值守／無登入 GUI session** 下該步驟會
+**逾時卡住**。設 `CI=true` 略過（dmg 仍會產出，只是 Finder 視窗版面為預設）：
+
+```bash
+cd apps/tokenTracer-host
+CI=true cargo tauri build
+shasum -a 256 ../../target/release/bundle/dmg/*.dmg
+```
+
+### 首次開啟：Gatekeeper 擋下時（D1）
+
+`tokenTracer.app` 目前是 **ad-hoc 簽署、未 notarize**（無 Apple Developer ID）。從 `.dmg` 拖到
+`/Applications` 後第一次開啟，macOS Gatekeeper 可能顯示「無法打開，因為無法驗證開發者」。任選其一：
+
+1. **右鍵（或 Control-點）`tokenTracer.app` → 打開 → 在對話框再按「打開」**（只需做一次）。  
+   若仍被擋：系統設定 → **隱私權與安全性** → 捲到底「仍要打開 “tokenTracer”」。
+2. 或移除隔離屬性後再開：
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/tokenTracer.app
+   open /Applications/tokenTracer.app
+   ```
+
+這**不是** Full Disk Access（FDA）：FDA 仍只是權限讀取失敗時的疑難排解，**不是安裝前置**（見上「權限失敗時」）。
 
 驗收（給驗收官／橋樑，**不自 PASS**）：
 
