@@ -23,6 +23,16 @@
 //! * `on_down(panel_was_expanded, now)` — tray `Click { Left, Down }`;
 //! * `on_up(now)` — tray `Click { Left, Up }` → [`UpAction`].
 //!
+//! # Menu-popup clicks (AC-F10 · macOS left-click-pops-menu fix)
+//!
+//! On macOS the context menu must **not** be attached to the status item at build
+//! time (tray-icon 0.24.2 calls `NSStatusItem.setMenu`, after which a plain left click
+//! pops the menu instead of opening the panel). The host attaches it only for a
+//! right-click / Ctrl-click. [`classify_click`] is the pure decision "is this click a
+//! menu popup, a panel toggle, or ignorable?"; [`TrayClickGuard::on_menu_click`] makes
+//! sure the Up half of a Ctrl-left-click (when Ctrl may already be released) is
+//! swallowed and never toggles the panel.
+//!
 //! Windows keeps its own behavior (left-click toggles Collapsed↔Expanded) and never
 //! constructs or consults this guard.
 
@@ -32,9 +42,45 @@ use std::time::{Duration, Instant};
 /// caused the dismissal and must not re-open the panel (~300 ms per AC-F10 B2).
 pub const SWALLOW_WINDOW: Duration = Duration::from_millis(300);
 
+/// Mouse button of a tray click, decoupled from tauri's type so this crate stays GUI-free.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrayButton {
+    Left,
+    Right,
+    Middle,
+}
+
+/// What a tray click means on macOS (see crate docs, "Menu-popup clicks").
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClickIntent {
+    /// Open / toggle the mini-panel (plain left click).
+    Panel,
+    /// Pop the context menu (right click, or Ctrl + left click).
+    Menu,
+    /// Nothing to do (e.g. middle click).
+    Ignore,
+}
+
+/// Pure classification of a tray click. `ctrl_held` = Control key down at event time.
+///
+/// * Right, or Left with Ctrl → [`ClickIntent::Menu`] (macOS convention: Ctrl-click == right-click)
+/// * Left without Ctrl → [`ClickIntent::Panel`]
+/// * anything else → [`ClickIntent::Ignore`]
+pub fn classify_click(button: TrayButton, ctrl_held: bool) -> ClickIntent {
+    match button {
+        TrayButton::Right => ClickIntent::Menu,
+        TrayButton::Left if ctrl_held => ClickIntent::Menu,
+        TrayButton::Left => ClickIntent::Panel,
+        TrayButton::Middle => ClickIntent::Ignore,
+    }
+}
+
 /// What the host should do on tray `Click { Left, Up }`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UpAction {
+    /// The click was a menu popup (e.g. Ctrl-left-click whose Ctrl was released before
+    /// Up): do nothing — in particular never toggle the panel.
+    Ignore,
     /// Normal click: toggle the panel (Hidden/Collapsed → Expanded, Expanded → Hidden).
     Toggle,
     /// The click belonged to a dismissal: make sure the panel is hidden, never re-open.
@@ -58,6 +104,8 @@ pub struct TrayClickGuard {
     last_focus_dismiss: Option<Instant>,
     /// Set on Down when the click is part of a dismissal; consumed on Up.
     swallow_up: bool,
+    /// Set when a menu popup started on this press; the Left Up of that press is ignored.
+    menu_pending: bool,
 }
 
 impl TrayClickGuard {
@@ -65,7 +113,15 @@ impl TrayClickGuard {
         Self {
             last_focus_dismiss: None,
             swallow_up: false,
+            menu_pending: false,
         }
+    }
+
+    /// A click was classified as [`ClickIntent::Menu`] (right / Ctrl-left). The matching
+    /// Left Up, if any, must not toggle the panel. Cleared by the next [`Self::on_down`].
+    pub fn on_menu_click(&mut self) {
+        self.menu_pending = true;
+        self.swallow_up = false;
     }
 
     /// Record that the panel was just dismissed because the window lost focus.
@@ -78,6 +134,7 @@ impl TrayClickGuard {
     /// The click is a dismissal if the panel is still Expanded (focus loss has not been
     /// processed yet) **or** focus loss already dismissed it within [`SWALLOW_WINDOW`].
     pub fn on_down(&mut self, panel_was_expanded: bool, now: Instant) {
+        self.menu_pending = false;
         self.swallow_up =
             panel_was_expanded || within_swallow_window(self.last_focus_dismiss, now);
     }
@@ -87,6 +144,11 @@ impl TrayClickGuard {
     /// If no Down was seen (`swallow_up == false`) the timestamp rule still applies, so a
     /// lone Up right after a focus-loss dismissal is also swallowed.
     pub fn on_up(&mut self, now: Instant) -> UpAction {
+        if self.menu_pending {
+            self.menu_pending = false;
+            self.swallow_up = false;
+            return UpAction::Ignore;
+        }
         let swallow = self.swallow_up || within_swallow_window(self.last_focus_dismiss, now);
         self.swallow_up = false;
         if swallow {
@@ -224,5 +286,72 @@ mod tests {
         g.on_focus_lost(c);
         g.on_down(false, ms(c, 4));
         assert_eq!(g.on_up(ms(c, 70)), UpAction::DismissOnly);
+    }
+
+    // ---- menu-popup classification (macOS left-click-pops-menu fix) ----
+
+    #[test]
+    fn classify_plain_left_is_panel() {
+        assert_eq!(classify_click(TrayButton::Left, false), ClickIntent::Panel);
+    }
+
+    #[test]
+    fn classify_right_is_menu_regardless_of_ctrl() {
+        assert_eq!(classify_click(TrayButton::Right, false), ClickIntent::Menu);
+        assert_eq!(classify_click(TrayButton::Right, true), ClickIntent::Menu);
+    }
+
+    #[test]
+    fn classify_ctrl_left_is_menu() {
+        assert_eq!(classify_click(TrayButton::Left, true), ClickIntent::Menu);
+    }
+
+    #[test]
+    fn classify_middle_is_ignored() {
+        assert_eq!(classify_click(TrayButton::Middle, false), ClickIntent::Ignore);
+        assert_eq!(classify_click(TrayButton::Middle, true), ClickIntent::Ignore);
+    }
+
+    /// Ctrl-left Down starts a menu popup; Ctrl released before Up → Up (now "plain left")
+    /// must NOT toggle the panel.
+    #[test]
+    fn ctrl_left_up_after_menu_is_ignored() {
+        let mut g = TrayClickGuard::new();
+        let b = t0();
+        g.on_menu_click();
+        assert_eq!(g.on_up(ms(b, 400)), UpAction::Ignore);
+    }
+
+    /// Menu popup consumed once: the next ordinary click toggles again.
+    #[test]
+    fn menu_ignore_is_one_shot() {
+        let mut g = TrayClickGuard::new();
+        let b = t0();
+        g.on_menu_click();
+        assert_eq!(g.on_up(ms(b, 100)), UpAction::Ignore);
+        g.on_down(false, ms(b, 2000));
+        assert_eq!(g.on_up(ms(b, 2060)), UpAction::Toggle);
+    }
+
+    /// Right-click popup has no Left Up; the stale flag is cleared by the next Left Down.
+    #[test]
+    fn stale_menu_flag_cleared_by_next_down() {
+        let mut g = TrayClickGuard::new();
+        let b = t0();
+        g.on_menu_click(); // right-click: no Left Up ever arrives
+        g.on_down(false, ms(b, 5000));
+        assert_eq!(g.on_up(ms(b, 5060)), UpAction::Toggle);
+    }
+
+    /// A menu click clears a pending dismissal swallow so it cannot leak into later clicks.
+    #[test]
+    fn menu_click_clears_pending_swallow() {
+        let mut g = TrayClickGuard::new();
+        let b = t0();
+        g.on_down(true, b);
+        g.on_menu_click();
+        assert_eq!(g.on_up(ms(b, 50)), UpAction::Ignore);
+        g.on_down(false, ms(b, 9000));
+        assert_eq!(g.on_up(ms(b, 9050)), UpAction::Toggle);
     }
 }

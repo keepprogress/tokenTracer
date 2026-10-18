@@ -31,6 +31,9 @@ tokentracer-bridge = { path = "../bridge" }
 # AC-F10 B2: click-vs-focus-loss arbitration (macOS menu-bar only; pure, unit-tested on Linux CI).
 [target.'cfg(target_os = "macos")'.dependencies]
 tokentracer-tray-guard = { path = "../../crates/tray-guard" }
+# Ctrl-key state for Ctrl+click → context menu (tauri's tray click event has no modifiers).
+# Version/features match what tauri/tray-icon already pull in transitively.
+objc2-app-kit = { version = "0.3", default-features = false, features = ["NSEvent"] }
 
 [features]
 default = ["custom-protocol"]
