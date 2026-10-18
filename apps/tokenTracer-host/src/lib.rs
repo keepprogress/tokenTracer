@@ -11,6 +11,8 @@
 //!   NSStatusItem equivalent) + dropdown mini-panel. Same Collapsed/Expanded IA
 //!   as Windows; not a full-page web primary UI.
 
+#[macro_use]
+mod debug;
 mod commands;
 mod panel;
 mod spend_cli;
@@ -69,14 +71,23 @@ pub fn run() {
                 let _ = window.hide();
                 if let Some(state) = window.try_state::<panel::PanelState>() {
                     *state.mode.lock().unwrap() = panel::PanelMode::Hidden;
+                    #[cfg(target_os = "macos")]
+                    state.click_guard.lock().unwrap().on_mode_change(false, false);
+                }
+            }
+            #[cfg(target_os = "macos")]
+            tauri::WindowEvent::Focused(true) => {
+                if let Some(state) = window.try_state::<panel::PanelState>() {
+                    panel::note_focus_gained(&state);
                 }
             }
             #[cfg(target_os = "macos")]
             tauri::WindowEvent::Focused(false) => {
-                // Menu-bar pattern: lose focus → dismiss panel (icon remains).
+                // Menu-bar pattern: lose focus → dismiss panel (icon remains) — but only if the
+                // blur is real (see tokentracer_tray_guard "Stale blurs").
                 if let Some(state) = window.try_state::<panel::PanelState>() {
                     let app = window.app_handle();
-                    let _ = panel::dismiss_on_focus_loss(app, &state);
+                    let _ = panel::on_focus_loss(app, &state);
                 }
             }
             _ => {}

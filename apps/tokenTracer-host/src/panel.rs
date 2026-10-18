@@ -221,10 +221,31 @@ pub fn position_panel(win: &WebviewWindow, state: &PanelState) -> Result<()> {
 }
 
 pub fn apply_mode(app: &AppHandle, state: &PanelState, mode: PanelMode) -> Result<()> {
-    {
-        *state.mode.lock().unwrap() = mode;
-    }
     let win = main_window(app)?;
+    let prev = {
+        let mut m = state.mode.lock().unwrap();
+        let prev = *m;
+        *m = mode;
+        prev
+    };
+    // macOS: new panel state = new generation. Must happen BEFORE show()/set_focus() so a
+    // Focused(true)/(false) produced by them is attributed to the new state, and records whether
+    // the native window already had focus (e.g. Collapsed → Expanded via the in-panel button).
+    #[cfg(target_os = "macos")]
+    if prev != mode {
+        let focused_now = win.is_focused().unwrap_or(false);
+        let mut g = state.click_guard.lock().unwrap();
+        g.on_mode_change(mode != PanelMode::Hidden, focused_now);
+        tt_dbg!(
+            "apply_mode {} -> {} gen={} window_focused_before={}",
+            prev.as_str(),
+            mode.as_str(),
+            g.generation(),
+            focused_now
+        );
+    }
+    #[cfg(not(target_os = "macos"))]
+    tt_dbg!("apply_mode {} -> {}", prev.as_str(), mode.as_str());
     match mode {
         PanelMode::Hidden => {
             let _ = win.hide();
@@ -293,21 +314,89 @@ pub fn dismiss_to_menu_bar(app: &AppHandle, state: &PanelState) -> Result<()> {
     apply_mode(app, state, PanelMode::Hidden)
 }
 
-/// macOS: panel lost focus → dismiss. If it was **Expanded**, also remember *when* so the tray
-/// click that caused the blur does not immediately re-open it (AC-F10 B2; see
-/// `tokentracer_tray_guard`). A blur while **Collapsed** still hides the panel (original
-/// behavior) but must NOT arm the guard — otherwise the next tray click within 300 ms would be
-/// classified DismissOnly and the panel could never go Hidden → Expanded.
+/// macOS: `Focused(true)` — the current panel generation has had focus.
 #[cfg(target_os = "macos")]
-pub fn dismiss_on_focus_loss(app: &AppHandle, state: &PanelState) -> Result<()> {
+pub fn note_focus_gained(state: &PanelState) {
+    let mut g = state.click_guard.lock().unwrap();
+    g.on_focus_gained();
+    tt_dbg!(
+        "Focused(true): mode={} gen={}",
+        state.mode.lock().unwrap().as_str(),
+        g.generation()
+    );
+}
+
+/// macOS: `Focused(false)` — decide whether the panel really lost focus.
+///
+/// R6: a blur can be delivered late (after the tray Up already showed Expanded, or as a
+/// duplicate/flicker); the old handler hid whatever the *current* mode was. Now
+/// (`tokentracer_tray_guard`, state-based — **no** "ignore blurs for N ms" window, so a genuine
+/// click-outside still collapses promptly):
+/// 1. ignore if the current panel generation never had focus, or the window is focused now;
+/// 2. otherwise defer one main-loop turn ([`resolve_focus_loss`]) and re-check.
+#[cfg(target_os = "macos")]
+pub fn on_focus_loss(app: &AppHandle, state: &PanelState) -> Result<()> {
+    use tokentracer_tray_guard::BlurVerdict;
     let cur = *state.mode.lock().unwrap();
     if cur == PanelMode::Hidden {
+        tt_dbg!("Focused(false): mode=hidden -> no-op");
         return Ok(());
     }
-    state
-        .click_guard
-        .lock()
-        .unwrap()
-        .on_blur(cur == PanelMode::Expanded, std::time::Instant::now());
-    apply_mode(app, state, PanelMode::Hidden)
+    let win = main_window(app)?;
+    let focused_now = win.is_focused().unwrap_or(false);
+    let verdict = state.click_guard.lock().unwrap().on_blur_event(focused_now);
+    tt_dbg!(
+        "Focused(false): mode={} window_focused_now={} -> {:?} guard={:?}",
+        cur.as_str(),
+        focused_now,
+        verdict,
+        *state.click_guard.lock().unwrap()
+    );
+    if let BlurVerdict::Defer { generation } = verdict {
+        // One-shot thread → run_on_main_thread = the *next* main-loop turn (inline calls from
+        // the main thread would not defer).
+        let app2 = app.clone();
+        std::thread::spawn(move || {
+            let app3 = app2.clone();
+            let _ = app2.run_on_main_thread(move || {
+                if let Some(state) = app3.try_state::<PanelState>() {
+                    let _ = resolve_focus_loss(&app3, &state, generation);
+                }
+            });
+        });
+    }
+    Ok(())
+}
+
+/// Deferred half of [`on_focus_loss`]: re-read mode + actual focus, then dismiss or ignore.
+#[cfg(target_os = "macos")]
+fn resolve_focus_loss(app: &AppHandle, state: &PanelState, generation: u64) -> Result<()> {
+    use tokentracer_tray_guard::BlurResolution;
+    let cur = *state.mode.lock().unwrap();
+    let focused_now = main_window(app)
+        .ok()
+        .and_then(|w| w.is_focused().ok())
+        .unwrap_or(false);
+    let res = state.click_guard.lock().unwrap().resolve_blur(
+        generation,
+        focused_now,
+        cur == PanelMode::Expanded,
+        std::time::Instant::now(),
+    );
+    tt_dbg!(
+        "blur re-check: gen_at_blur={} mode={} window_focused_now={} -> {:?}",
+        generation,
+        cur.as_str(),
+        focused_now,
+        res
+    );
+    match res {
+        BlurResolution::Ignore(_) => Ok(()),
+        BlurResolution::Dismiss | BlurResolution::DismissAndArm => {
+            if cur == PanelMode::Hidden {
+                return Ok(());
+            }
+            apply_mode(app, state, PanelMode::Hidden)
+        }
+    }
 }

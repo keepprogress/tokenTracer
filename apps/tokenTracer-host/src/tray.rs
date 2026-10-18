@@ -117,18 +117,24 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
                 match (classify_click(tb, ctrl_held_macos()), button_state) {
                     // Right / Ctrl-left press → context menu (never the panel).
                     (ClickIntent::Menu, MouseButtonState::Down) => {
+                        tt_dbg!("tray menu-click Down (right/ctrl) mode={}", state.mode.lock().unwrap().as_str());
                         state.click_guard.lock().unwrap().on_menu_click();
                         popup_menu_macos(app, tray, &menu_for_popup);
                     }
                     (ClickIntent::Menu, MouseButtonState::Up) => {}
                     (ClickIntent::Panel, MouseButtonState::Down) => {
                         panel::remember_tray_rect(&state, rect);
-                        let expanded = *state.mode.lock().unwrap() == panel::PanelMode::Expanded;
-                        state.click_guard.lock().unwrap().on_down(expanded, now);
+                        let mode = *state.mode.lock().unwrap();
+                        let expanded = mode == panel::PanelMode::Expanded;
+                        let mut g = state.click_guard.lock().unwrap();
+                        g.on_down(expanded, now);
+                        tt_dbg!("tray Down: mode={} expanded={} guard={:?}", mode.as_str(), expanded, *g);
                     }
                     (ClickIntent::Panel, MouseButtonState::Up) => {
                         panel::remember_tray_rect(&state, rect);
+                        let mode = *state.mode.lock().unwrap();
                         let action = state.click_guard.lock().unwrap().on_up(now);
+                        tt_dbg!("tray Up: mode={} -> {:?}", mode.as_str(), action);
                         match action {
                             UpAction::Toggle => {
                                 let _ = panel::toggle_panel(app, &state);
