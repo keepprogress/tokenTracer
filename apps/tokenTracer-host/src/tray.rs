@@ -17,6 +17,8 @@ use tauri::{
 };
 
 use crate::panel::{self, PanelState};
+#[cfg(target_os = "macos")]
+use tokentracer_tray_guard::UpAction;
 
 /// Single tray / status-item id (created only in [`install`]).
 pub const TRAY_ID: &str = "main";
@@ -68,19 +70,52 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
+            let app = tray.app_handle();
+
+            // macOS: decide click-vs-focus-loss on Down, act on Up (AC-F10 B2).
+            #[cfg(target_os = "macos")]
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
+                button_state,
                 rect,
                 ..
             } = &event
             {
-                let app = tray.app_handle();
+                let Some(state) = app.try_state::<PanelState>() else {
+                    return;
+                };
+                let now = std::time::Instant::now();
+                match button_state {
+                    MouseButtonState::Down => {
+                        panel::remember_tray_rect(&state, rect);
+                        let expanded = *state.mode.lock().unwrap() == panel::PanelMode::Expanded;
+                        state.click_guard.lock().unwrap().on_down(expanded, now);
+                    }
+                    MouseButtonState::Up => {
+                        panel::remember_tray_rect(&state, rect);
+                        let action = state.click_guard.lock().unwrap().on_up(now);
+                        match action {
+                            UpAction::Toggle => {
+                                let _ = panel::toggle_panel(app, &state);
+                            }
+                            UpAction::DismissOnly => {
+                                let _ = panel::dismiss_to_menu_bar(app, &state);
+                            }
+                        }
+                    }
+                }
+                return;
+            }
+
+            // Windows / Linux: left-click Up toggles Collapsed↔Expanded (unchanged).
+            #[cfg(not(target_os = "macos"))]
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = &event
+            {
                 if let Some(state) = app.try_state::<PanelState>() {
-                    #[cfg(target_os = "macos")]
-                    panel::remember_tray_rect(&state, rect);
-                    #[cfg(not(target_os = "macos"))]
-                    let _ = rect;
                     let _ = panel::toggle_panel(app, &state);
                 }
             }

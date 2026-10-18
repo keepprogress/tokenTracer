@@ -28,6 +28,10 @@ thiserror = { workspace = true }
 # Soft dep: bridge lib for discover later (not required for spend CLI path).
 tokentracer-bridge = { path = "../bridge" }
 
+# AC-F10 B2: click-vs-focus-loss arbitration (macOS menu-bar only; pure, unit-tested on Linux CI).
+[target.'cfg(target_os = "macos")'.dependencies]
+tokentracer-tray-guard = { path = "../../crates/tray-guard" }
+
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]

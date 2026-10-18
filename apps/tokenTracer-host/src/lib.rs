@@ -76,7 +76,7 @@ pub fn run() {
                 // Menu-bar pattern: lose focus → dismiss panel (icon remains).
                 if let Some(state) = window.try_state::<panel::PanelState>() {
                     let app = window.app_handle();
-                    let _ = panel::dismiss_to_menu_bar(app, &state);
+                    let _ = panel::dismiss_on_focus_loss(app, &state);
                 }
             }
             _ => {}

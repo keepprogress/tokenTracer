@@ -13,6 +13,8 @@ use tauri::{
 };
 #[cfg(target_os = "macos")]
 use tauri::Position;
+#[cfg(target_os = "macos")]
+use tokentracer_tray_guard::TrayClickGuard;
 
 pub const WIN_LABEL: &str = "main";
 
@@ -86,6 +88,10 @@ pub struct PanelState {
     pub mode: Mutex<PanelMode>,
     #[cfg(target_os = "macos")]
     pub tray_anchor: Mutex<Option<TrayAnchor>>,
+    /// AC-F10 B2: arbitrates tray click vs. focus-loss dismissal (macOS only; Windows
+    /// keeps plain Collapsed↔Expanded toggle).
+    #[cfg(target_os = "macos")]
+    pub click_guard: Mutex<TrayClickGuard>,
 }
 
 impl Default for PanelState {
@@ -95,6 +101,8 @@ impl Default for PanelState {
             mode: Mutex::new(PanelMode::Collapsed),
             #[cfg(target_os = "macos")]
             tray_anchor: Mutex::new(None),
+            #[cfg(target_os = "macos")]
+            click_guard: Mutex::new(TrayClickGuard::new()),
         }
     }
 }
@@ -282,5 +290,21 @@ pub fn dismiss_to_menu_bar(app: &AppHandle, state: &PanelState) -> Result<()> {
     if cur == PanelMode::Hidden {
         return Ok(());
     }
+    apply_mode(app, state, PanelMode::Hidden)
+}
+
+/// macOS: panel lost focus → dismiss, and remember *when* so the tray click that caused
+/// the focus loss does not immediately re-open it (AC-F10 B2; see `tokentracer_tray_guard`).
+#[cfg(target_os = "macos")]
+pub fn dismiss_on_focus_loss(app: &AppHandle, state: &PanelState) -> Result<()> {
+    let cur = *state.mode.lock().unwrap();
+    if cur == PanelMode::Hidden {
+        return Ok(());
+    }
+    state
+        .click_guard
+        .lock()
+        .unwrap()
+        .on_focus_lost(std::time::Instant::now());
     apply_mode(app, state, PanelMode::Hidden)
 }
