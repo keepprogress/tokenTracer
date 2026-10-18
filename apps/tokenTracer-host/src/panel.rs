@@ -293,8 +293,11 @@ pub fn dismiss_to_menu_bar(app: &AppHandle, state: &PanelState) -> Result<()> {
     apply_mode(app, state, PanelMode::Hidden)
 }
 
-/// macOS: panel lost focus → dismiss, and remember *when* so the tray click that caused
-/// the focus loss does not immediately re-open it (AC-F10 B2; see `tokentracer_tray_guard`).
+/// macOS: panel lost focus → dismiss. If it was **Expanded**, also remember *when* so the tray
+/// click that caused the blur does not immediately re-open it (AC-F10 B2; see
+/// `tokentracer_tray_guard`). A blur while **Collapsed** still hides the panel (original
+/// behavior) but must NOT arm the guard — otherwise the next tray click within 300 ms would be
+/// classified DismissOnly and the panel could never go Hidden → Expanded.
 #[cfg(target_os = "macos")]
 pub fn dismiss_on_focus_loss(app: &AppHandle, state: &PanelState) -> Result<()> {
     let cur = *state.mode.lock().unwrap();
@@ -305,6 +308,6 @@ pub fn dismiss_on_focus_loss(app: &AppHandle, state: &PanelState) -> Result<()> 
         .click_guard
         .lock()
         .unwrap()
-        .on_focus_lost(std::time::Instant::now());
+        .on_blur(cur == PanelMode::Expanded, std::time::Instant::now());
     apply_mode(app, state, PanelMode::Hidden)
 }

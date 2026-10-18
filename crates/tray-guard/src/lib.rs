@@ -122,11 +122,26 @@ impl TrayClickGuard {
     pub fn on_menu_click(&mut self) {
         self.menu_pending = true;
         self.swallow_up = false;
+        // A blur caused by this right/Ctrl click belongs to the menu press, not to a later click.
+        self.last_focus_dismiss = None;
     }
 
     /// Record that the panel was just dismissed because the window lost focus.
     pub fn on_focus_lost(&mut self, now: Instant) {
         self.last_focus_dismiss = Some(now);
+    }
+
+    /// Window blur (`Focused(false)`) with the panel in some mode. Records the dismissal
+    /// **only if the panel was Expanded**; returns whether it was recorded.
+    ///
+    /// A blur while Collapsed (small strip) must not arm the swallow window: the next tray
+    /// click is then an ordinary Hidden → Expanded open, not "the click that caused the
+    /// dismissal". (Host still hides the panel on any blur; only the *guard* differs.)
+    pub fn on_blur(&mut self, panel_was_expanded: bool, now: Instant) -> bool {
+        if panel_was_expanded {
+            self.on_focus_lost(now);
+        }
+        panel_was_expanded
     }
 
     /// Tray button went down. `panel_was_expanded` = panel mode at that instant.
@@ -353,5 +368,107 @@ mod tests {
         assert_eq!(g.on_up(ms(b, 50)), UpAction::Ignore);
         g.on_down(false, ms(b, 9000));
         assert_eq!(g.on_up(ms(b, 9050)), UpAction::Toggle);
+    }
+
+    // ---- blur-while-Collapsed must not swallow the next click (review blocker) ----
+
+    /// Collapsed blur, then tray click within 300 ms → normal toggle (open), not DismissOnly.
+    #[test]
+    fn collapsed_blur_then_click_toggles() {
+        let mut g = TrayClickGuard::new();
+        let b = t0();
+        assert!(!g.on_blur(false, b));
+        g.on_down(false, ms(b, 5)); // panel Hidden after the blur
+        assert_eq!(g.on_up(ms(b, 60)), UpAction::Toggle);
+    }
+
+    /// Same, but only an Up is delivered (no Down).
+    #[test]
+    fn collapsed_blur_then_lone_up_toggles() {
+        let mut g = TrayClickGuard::new();
+        let b = t0();
+        g.on_blur(false, b);
+        assert_eq!(g.on_up(ms(b, 40)), UpAction::Toggle);
+    }
+
+    /// Expanded blur, then click within 300 ms → DismissOnly (B2 behavior preserved).
+    #[test]
+    fn expanded_blur_then_click_dismisses() {
+        let mut g = TrayClickGuard::new();
+        let b = t0();
+        assert!(g.on_blur(true, b));
+        g.on_down(false, ms(b, 5));
+        assert_eq!(g.on_up(ms(b, 60)), UpAction::DismissOnly);
+    }
+
+    /// Down before blur (panel Expanded at Down), blur Expanded afterwards.
+    #[test]
+    fn down_then_expanded_blur_dismisses() {
+        let mut g = TrayClickGuard::new();
+        let b = t0();
+        g.on_down(true, b);
+        g.on_blur(true, ms(b, 3));
+        assert_eq!(g.on_up(ms(b, 90)), UpAction::DismissOnly);
+    }
+
+    /// Down on a Collapsed panel, then blur(Collapsed) → still a normal toggle.
+    #[test]
+    fn down_collapsed_then_collapsed_blur_toggles() {
+        let mut g = TrayClickGuard::new();
+        let b = t0();
+        g.on_down(false, b);
+        g.on_blur(false, ms(b, 3));
+        assert_eq!(g.on_up(ms(b, 90)), UpAction::Toggle);
+    }
+
+    /// Stale Expanded blur (> 300 ms) does not affect a later click.
+    #[test]
+    fn stale_expanded_blur_via_on_blur_toggles() {
+        let mut g = TrayClickGuard::new();
+        let b = t0();
+        g.on_blur(true, b);
+        g.on_down(false, ms(b, 301));
+        assert_eq!(g.on_up(ms(b, 350)), UpAction::Toggle);
+    }
+
+    /// A Collapsed blur after an old Expanded blur does not refresh the window.
+    #[test]
+    fn collapsed_blur_does_not_refresh_old_expanded_blur() {
+        let mut g = TrayClickGuard::new();
+        let b = t0();
+        g.on_blur(true, b);
+        g.on_blur(false, ms(b, 1000)); // panel re-opened as Collapsed, blurred
+        g.on_down(false, ms(b, 1100));
+        assert_eq!(g.on_up(ms(b, 1150)), UpAction::Toggle);
+    }
+
+    /// One Expanded blur swallows exactly one click; the next opens.
+    #[test]
+    fn one_expanded_blur_swallows_exactly_one_click() {
+        let mut g = TrayClickGuard::new();
+        let b = t0();
+        g.on_blur(true, b);
+        g.on_down(false, ms(b, 4));
+        assert_eq!(g.on_up(ms(b, 50)), UpAction::DismissOnly);
+        g.on_down(false, ms(b, 120));
+        assert_eq!(g.on_up(ms(b, 160)), UpAction::Toggle);
+    }
+
+    /// Menu path unaffected by blur kind: right/Ctrl-click after an Expanded blur ignores the
+    /// Up and the *following* ordinary click is not swallowed.
+    #[test]
+    fn menu_path_unaffected_by_blur() {
+        let mut g = TrayClickGuard::new();
+        let b = t0();
+        g.on_blur(true, b); // panel was open; right-click blurs it
+        g.on_menu_click();
+        assert_eq!(g.on_up(ms(b, 40)), UpAction::Ignore);
+        // menu_pending consumed; the blur window was consumed too (one-shot)
+        g.on_down(false, ms(b, 100));
+        assert_eq!(g.on_up(ms(b, 140)), UpAction::Toggle);
+        // Collapsed blur + Ctrl-click: still just a menu, panel untouched.
+        g.on_blur(false, ms(b, 500));
+        g.on_menu_click();
+        assert_eq!(g.on_up(ms(b, 520)), UpAction::Ignore);
     }
 }

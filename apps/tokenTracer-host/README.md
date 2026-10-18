@@ -33,7 +33,7 @@
 |------|------|
 | **選單列圖示** | **只有 1 個** status item（僅 `tray.rs` 建立；`tauri.conf.json` 不得再宣告 `app.trayIcon`） |
 | **點選單列圖示** | 顯示 **Expanded** 迷你面板（對齊 IA）；若已開則 **收合為僅圖示**（Hidden；點圖示造成的失焦不會把它再開回來，約 300 ms 內視為同一次點擊） |
-| **失焦／點外面** | 面板關閉，回到選單列圖示（常駐） |
+| **失焦／點外面** | 面板關閉，回到選單列圖示（常駐）。僅 **Expanded** 失焦會讓緊接（≤300 ms）的圖示點擊視為「同一次關閉」而不重開；**Collapsed** 失焦不影響下一次點擊（仍可 Hidden→Expanded） |
 | **右鍵／Ctrl-點選單** | **Show panel**／**Refresh**／**Import…**／**Quit**。**左鍵絕不彈選單**：macOS 的選單**不在建圖示時掛上**（tray-icon 0.24.2 於 build 時 `setMenu` 會讓左鍵直接彈選單、面板打不開）；僅在右鍵／Ctrl+左鍵時暫時掛上→彈出→卸下。Windows／Linux 仍於建立時掛選單（行為不變） |
 | 關閉視窗 | 隱藏到選單列（常駐），不結束；結束請用 **Quit** |
 | 啟動預設 | **僅選單列圖示**（Hidden）；無 Dock 圖示（`ActivationPolicy::Accessory`） |
