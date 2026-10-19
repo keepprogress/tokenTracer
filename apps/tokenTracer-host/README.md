@@ -32,9 +32,9 @@
 | 操作 | 行為 |
 |------|------|
 | **選單列圖示** | **只有 1 個** status item（僅 `tray.rs` 建立；`tauri.conf.json` 不得再宣告 `app.trayIcon`）。macOS 圖示＝`icons/tray.png`（44×44 RGBA、**黑色字形＋透明背景**的 template image，系統依淺／深色選單列自動著色；由 `scripts/gen-tray-template-icon.py` 產生）；Windows／Linux 用彩色 `icons/tray-color.png`（黑色字形在深色工作列幾乎看不見，故不共用） |
-| **點選單列圖示** | 顯示 **Expanded** 迷你面板（對齊 IA）；若已開則 **收合為僅圖示**（Hidden；點圖示造成的失焦不會把它再開回來，約 300 ms 內視為同一次點擊） |
-| **失焦／點外面** | 面板關閉，回到選單列圖示（常駐）。僅 **Expanded** 失焦會讓緊接（≤300 ms）的圖示點擊視為「同一次關閉」而不重開；**Collapsed** 失焦不影響下一次點擊（仍可 Hidden→Expanded） |
-| **右鍵／Ctrl-點選單** | **Show panel**／**Refresh**／**Import…**／**Quit**。**左鍵絕不彈選單**：macOS 的選單**不在建圖示時掛上**（tray-icon 0.24.2 於 build 時 `setMenu` 會讓左鍵直接彈選單、面板打不開）；僅在右鍵／Ctrl+左鍵時暫時掛上→彈出→卸下。Windows／Linux 仍於建立時掛選單（行為不變） |
+| **點選單列圖示** | 顯示 **Expanded** 迷你面板（對齊 IA）；若已開，**設計上**收合為僅圖示（Hidden）。點圖示本身造成的失焦，會依 Down 當下的狀態（面板已 Expanded）／緊接前一次 Expanded 失焦（≤300 ms）判定為「同一次關閉」而不重開 |
+| **失焦／點外面** | 面板**通常**關閉並回到選單列圖示（常駐）。只有「這個面板狀態確實取得過焦點、且稍後（下一個 main-loop 回合）視窗實際仍未取得焦點」的失焦才算關閉；較晚到的舊失焦、重複失焦、焦點很快回來的閃動會被忽略（見下「失焦判定」）。**Collapsed** 失焦會隱藏面板，但不影響下一次點擊（仍可 Hidden→Expanded）；**Expanded** 失焦才會讓緊接（≤300 ms）的圖示點擊視為「同一次關閉」。macOS 專屬；Windows 不使用 |
+| **右鍵／Ctrl-點選單** | **Show panel**／**Refresh**／**Import…**／**Quit**。macOS 的選單**刻意不在建立圖示時掛上**（tray-icon 0.24.2 於 build 時 `setMenu`，實機上左鍵會直接彈出選單而打不開面板）；僅在右鍵／Ctrl+左鍵時暫時掛上→彈出→卸下，因此**預期**左鍵只切換面板（實機已驗證 d5abd29 左鍵 windows 0→1→0；未涵蓋所有 macOS 版本）。Windows／Linux 仍於建立時掛選單 |
 | 關閉視窗 | 隱藏到選單列（常駐），不結束；結束請用 **Quit** |
 | 啟動預設 | **僅選單列圖示**（Hidden）；無 Dock 圖示（`ActivationPolicy::Accessory`） |
 | Collapsed | 自 Expanded 點收合／Esc 時顯示縮圖條（錨在選單列附近／右上）；再點圖示可回 Expanded 或 Hidden |
@@ -126,6 +126,38 @@ shasum -a 256 ../../target/release/bundle/dmg/*.dmg
 `{ "script": "npm run build|dev", "cwd": "../ui" }`。tauri-cli 在跑 hook 前會先 chdir 到 tauri 目錄
 （`apps/tokenTracer-host`），所以 `../ui` ＝ `apps/ui`，與你從哪個目錄呼叫無關（**不要**再用
 `npm --prefix ../ui`：hook 預設 cwd 是 `apps/`，會解到 `<repo>/ui` 而找不到）。
+
+### 失焦判定（macOS，R6）
+
+實機曾見「Collapsed → 失焦 → 100–250 ms 後點圖示」約 16%（5/32）最後沒有視窗。程式碼讀法（**未在 Mac 上證實**）：
+較晚到的 `Focused(false)` 在 Up 已把面板切成 Expanded **之後**才處理，舊程式用「目前模式」把剛展開的面板又收回。
+現行設計**不用**「展開後 N ms 內忽略失焦」（那會讓點外面不收合），改為純狀態判定（`crates/tray-guard`）：
+
+1. 每次面板模式變更＝新的 *generation*，並記錄當下視窗是否已有焦點；`Focused(true)` 到達則標記此 generation 取得過焦點。
+2. `Focused(false)`：此 generation 沒取得過焦點 → 忽略（舊狀態的失焦）；視窗當下 `is_focused()` ＝ true → 忽略；否則延後到**下一個 main-loop 回合**重判。
+3. 重判：generation 已變 → 忽略；視窗又有焦點 → 忽略；仍無焦點 → 關閉（Expanded 才會啟動「同一次點擊不重開」的 300 ms 窗）。
+
+取捨：面板若從未取得焦點（例如啟用失敗），就不會因失焦自動關閉，需再點圖示或用選單。
+
+### 除錯：`TT_TRAY_DEBUG`（預設關閉）
+
+啟動時設 `TT_TRAY_DEBUG`：`1` ＝ 寫 stderr；其他值 ＝ 當檔案路徑（附加寫入）。`open` 會丟棄 stderr，建議：
+
+```bash
+rm -f /tmp/tt-tray.log
+open --env TT_TRAY_DEBUG=/tmp/tt-tray.log /Applications/tokenTracer.app
+# 或直接跑二進位： TT_TRAY_DEBUG=1 /Applications/tokenTracer.app/Contents/MacOS/tokentracer-host
+tail -f /tmp/tt-tray.log
+```
+
+每行 `[tt-tray mono=<ms 單調時鐘，自首次記錄起> unix=<epoch ms>] …`：`mono` 用來看順序／間隔，`unix` 可對齊腳本的 `Date.now()`。
+會記錄：`apply_mode a -> b gen=… window_focused_before=…`、`Focused(true)`、
+`Focused(false): mode=… window_focused_now=… -> Ignore(原因)|Defer{generation}`、`blur re-check: … -> Ignore(原因)|Dismiss|DismissAndArm`、`tray Down/Up: mode=… -> Toggle|DismissOnly|Ignore`。
+
+重跑情境 c 時每次試驗要看：
+- 成功：`Focused(false) … -> Defer` → `blur re-check … Dismiss`（Collapsed）→ `apply_mode collapsed -> hidden` → `tray Down: mode=hidden` → `tray Up … Toggle` → `apply_mode hidden -> expanded` →（`Focused(true)`）。
+- 若 blur 晚到：`Focused(false)` 出現在 `apply_mode … -> expanded` **之後** → 應看到 `Ignore(NeverFocusedInThisState)`／`Ignore(Superseded)`，視窗維持展開。
+- 仍失敗：找 `apply_mode expanded -> hidden` 前一行——若是 `blur re-check … DismissAndArm`，記下 `window_focused_now`、`gen` 與前後 `Focused(true)`；若前面沒有 blur 行，是別的路徑（UI invoke／CloseRequested）；若整個試驗沒有 `tray Down/Up` 行，點擊根本沒到 App（驅動／OS）。
 
 ### 無人值守／遠端 session 建 `.dmg`（D2）
 
